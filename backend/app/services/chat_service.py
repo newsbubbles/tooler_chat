@@ -1,0 +1,149 @@
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+from app.models.base import ChatSession, Message, Agent
+from typing import List, Optional
+from uuid import UUID
+from datetime import datetime
+from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
+
+
+async def create_chat_session(db: AsyncSession, user_id: int, agent_id: int, title: str) -> ChatSession:
+    """Create a new chat session"""
+    chat_session = ChatSession(
+        user_id=user_id,
+        agent_id=agent_id,
+        title=title
+    )
+    
+    db.add(chat_session)
+    await db.commit()
+    await db.refresh(chat_session)
+    return chat_session
+
+
+async def get_chat_session_by_id(db: AsyncSession, chat_session_id: int) -> Optional[ChatSession]:
+    """Get chat session by ID"""
+    return await db.get(ChatSession, chat_session_id)
+
+
+async def get_chat_session_by_uuid(db: AsyncSession, session_uuid: UUID) -> Optional[ChatSession]:
+    """Get chat session by UUID"""
+    query = select(ChatSession).where(ChatSession.uuid == session_uuid)
+    result = await db.execute(query)
+    return result.scalar_one_or_none()
+
+
+async def get_user_chat_sessions(db: AsyncSession, user_id: int) -> List[ChatSession]:
+    """Get all chat sessions for a user"""
+    query = select(ChatSession).where(ChatSession.user_id == user_id)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_user_agent_chat_sessions(db: AsyncSession, user_id: int, agent_id: int) -> List[ChatSession]:
+    """Get all chat sessions for a user with a specific agent"""
+    query = select(ChatSession).where(
+        (ChatSession.user_id == user_id) & 
+        (ChatSession.agent_id == agent_id)
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def update_chat_session(db: AsyncSession, chat_session_id: int, **kwargs) -> Optional[ChatSession]:
+    """Update chat session data"""
+    chat_session = await get_chat_session_by_id(db, chat_session_id)
+    if not chat_session:
+        return None
+    
+    # Update chat session fields
+    for key, value in kwargs.items():
+        if hasattr(chat_session, key):
+            setattr(chat_session, key, value)
+    
+    chat_session.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(chat_session)
+    return chat_session
+
+
+async def delete_chat_session(db: AsyncSession, chat_session_id: int) -> bool:
+    """Delete a chat session"""
+    chat_session = await get_chat_session_by_id(db, chat_session_id)
+    if not chat_session:
+        return False
+    
+    await db.delete(chat_session)
+    await db.commit()
+    return True
+
+
+async def create_message(db: AsyncSession, chat_session_id: int, role: str, content: str) -> Message:
+    """Create a new message"""
+    message = Message(
+        chat_session_id=chat_session_id,
+        role=role,
+        content=content
+    )
+    
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+    
+    # Update the chat session's updated_at timestamp
+    chat_session = await get_chat_session_by_id(db, chat_session_id)
+    if chat_session:
+        chat_session.updated_at = datetime.utcnow()
+        await db.commit()
+    
+    return message
+
+
+async def get_chat_session_messages(db: AsyncSession, chat_session_id: int) -> List[Message]:
+    """Get all messages for a chat session ordered by timestamp"""
+    query = select(Message).where(Message.chat_session_id == chat_session_id).order_by(Message.timestamp)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_messages_as_model_messages(db: AsyncSession, chat_session_id: int) -> List[ModelMessage]:
+    """Get chat session messages in a format suitable for the agent"""
+    messages = await get_chat_session_messages(db, chat_session_id)
+    model_messages_json = [
+        f'{{
+            "type": "model_message",
+            "message_type": "{"request" if msg.role == "user" else "response"}",
+            "parts": [
+                {{
+                    "type": "{"user_prompt" if msg.role == "user" else "text"}",
+                    "content": {repr(msg.content)},
+                    "timestamp": "{msg.timestamp.isoformat()}"
+                }}
+            ],
+            "timestamp": "{msg.timestamp.isoformat()}"
+        }}'
+        for msg in messages
+    ]
+    
+    return ModelMessagesTypeAdapter.validate_json('[' + ','.join(model_messages_json) + ']')
+
+
+async def add_model_messages(db: AsyncSession, chat_session_id: int, model_messages_json: str) -> List[Message]:
+    """Add messages from agent response to the database"""
+    model_messages = ModelMessagesTypeAdapter.validate_json(model_messages_json)
+    created_messages = []
+    
+    for msg in model_messages:
+        first_part = msg.parts[0]
+        role = "user" if msg.__pydantic_private__.message_type == "request" else "model"
+        content = first_part.content
+        
+        message = await create_message(
+            db=db,
+            chat_session_id=chat_session_id,
+            role=role,
+            content=content
+        )
+        created_messages.append(message)
+    
+    return created_messages
