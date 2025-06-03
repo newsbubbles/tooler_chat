@@ -65,7 +65,8 @@ tooler_chat/
 
 ### Prerequisites
 
-- Docker and Docker Compose
+- Docker (required for containerized deployment)
+- Docker Compose (optional - can run without it)
 - Node.js (for local frontend development)
 - Python 3.9+ (for local backend development)
 
@@ -85,11 +86,32 @@ cp .env.example .env
 # Edit the .env file with your configuration
 ```
 
-3. Start the application using Docker Compose
+3. Start the application using one of the following methods:
+
+#### Using Docker Compose
 
 ```bash
 ./setup.sh  # One-time setup
 ./run.sh    # Start the application
+```
+
+#### Using Docker Only (No Docker Compose)
+
+```bash
+./docker-chmod.sh  # Make scripts executable (one time only)
+./docker-run.sh    # Build and start containers
+```
+
+To stop the application when using Docker only:
+
+```bash
+./docker-stop.sh   # Stop containers
+```
+
+To completely clean up all Docker resources:
+
+```bash
+./docker-clean.sh  # Remove containers, images, and network
 ```
 
 4. Access the application at http://localhost:34140 (or the port specified in your .env file)
