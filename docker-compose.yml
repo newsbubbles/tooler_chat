@@ -4,11 +4,12 @@ services:
   backend:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-34130}:${BACKEND_PORT:-34130}"
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/toolerchat
       - SECRET_KEY=${SECRET_KEY:-very-secret-key-for-development-only}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PORT=${BACKEND_PORT:-34130}
     volumes:
       - ./backend/app:/app/app
     depends_on:
@@ -20,7 +21,10 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-34140}:80"
+    environment:
+      - BACKEND_URL=http://backend:${BACKEND_PORT:-34130}
+      - REACT_APP_API_URL=/api
     depends_on:
       - backend
     networks:

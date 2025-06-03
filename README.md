@@ -88,10 +88,28 @@ cp .env.example .env
 3. Start the application using Docker Compose
 
 ```bash
-docker-compose up -d
+./setup.sh  # One-time setup
+./run.sh    # Start the application
 ```
 
-4. Access the application at http://localhost:3000
+4. Access the application at http://localhost:34140 (or the port specified in your .env file)
+
+### Port Configuration
+
+The application uses environment variables to configure ports:
+
+- `BACKEND_PORT`: Port for the FastAPI backend API (default: 34130)
+- `FRONTEND_PORT`: Port for the React frontend (default: 34140)
+
+You can change these in your `.env` file to use different ports.
+
+If you want to use Nginx on the host system as a reverse proxy, run:
+
+```bash
+./generate-nginx-config.sh
+```
+
+This will create an `nginx-host.conf` file that you can include in your system's Nginx configuration.
 
 ### Development
 
@@ -100,20 +118,20 @@ docker-compose up -d
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 34130
 ```
 
-The API documentation will be available at http://localhost:8000/docs
+The API documentation will be available at http://localhost:34130/docs
 
 #### Frontend Development
 
 ```bash
 cd frontend
 npm install
-npm start
+PORT=34140 npm start
 ```
 
-The frontend development server will be available at http://localhost:3000
+The frontend development server will be available at http://localhost:34140
 
 ## License
 

@@ -10,12 +10,19 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+# Load environment variables
+source .env
+
+# Use default ports if not set in .env
+BACKEND_PORT=${BACKEND_PORT:-34130}
+FRONTEND_PORT=${FRONTEND_PORT:-34140}
+
 # Build and start the containers
 docker-compose up --build -d
 
 echo "Tooler Chat is starting up. Please wait a moment..."
-echo "Frontend will be available at http://localhost:3000"
-echo "Backend API will be available at http://localhost:8000"
-echo "API documentation will be available at http://localhost:8000/docs"
+echo "Frontend will be available at http://localhost:$FRONTEND_PORT"
+echo "Backend API will be available at http://localhost:$BACKEND_PORT"
+echo "API documentation will be available at http://localhost:$BACKEND_PORT/docs"
 
-echo "To stop the application, run: docker-compose down"
+echo "To stop the application, run: ./stop.sh"
