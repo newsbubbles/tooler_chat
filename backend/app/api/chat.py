@@ -21,16 +21,20 @@ from app.services.chat_service import (
 from app.services.agent_service import get_agent_by_id, get_agent_mcp_servers
 from app.services.mcp_server_service import get_mcp_server_by_id
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, RunContext
 from pydantic_ai.mcp import MCPServerStdio
+from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.agent import AgentRunResult
 import os
 import asyncio
+import tempfile
 
 router = APIRouter(tags=["chat"])
 
-# Configure OpenAI API key
+# Configure API keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 
 async def get_agent_instance(agent_id: int, db: AsyncSession):
@@ -44,30 +48,49 @@ async def get_agent_instance(agent_id: int, db: AsyncSession):
     mcp_servers_db = await get_agent_mcp_servers(db, agent_id)
     mcp_servers = []
     
+    # Prepare environment variables for MCP servers
+    # In a production system, these would be securely stored and retrieved
+    env = {
+        "OPENAI_API_KEY": OPENAI_API_KEY,
+        "OPENROUTER_API_KEY": OPENROUTER_API_KEY,
+        # Add other necessary API keys from environment or secure storage
+    }
+    
     # Configure MCP servers
     for mcp_server_db in mcp_servers_db:
         # Create a temporary file with the MCP server code
-        import tempfile
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as temp_file:
             temp_file.write(mcp_server_db.code)
             mcp_server_path = temp_file.name
         
-        # Create MCPServerStdio instance
-        # In a real implementation, you would need to handle environment variables securely
-        mcp_server = MCPServerStdio('python', [mcp_server_path])
+        # Create MCPServerStdio instance with environment variables
+        mcp_server = MCPServerStdio('python', [mcp_server_path], env=env)
         mcp_servers.append(mcp_server)
     
-    # Create agent instance
-    # Configure the model provider - using OpenAI as a default
-    model = "gpt-4-turbo"  # Default model, could be configurable per agent
-    provider = OpenAIProvider(api_key=OPENAI_API_KEY)
+    # Configure the model - using OpenRouter for access to various models
+    default_model = "anthropic/claude-3.7-sonnet"  # Default model, could be configurable per agent
+    
+    # Use OpenAI provider with OpenRouter base URL if OPENROUTER_API_KEY is available
+    # Otherwise fall back to regular OpenAI
+    if OPENROUTER_API_KEY:
+        provider = OpenAIProvider(
+            base_url='https://openrouter.ai/api/v1',
+            api_key=OPENROUTER_API_KEY
+        )
+    else:
+        provider = OpenAIProvider(api_key=OPENAI_API_KEY)
+    
+    # Create the model with appropriate configuration
+    model = OpenAIModel(
+        default_model,
+        provider=provider
+    )
     
     # Create the agent with the system prompt from the database
     agent_instance = Agent(
-        f"openai:{model}",  # This should be configurable in a production system
-        provider=provider,
-        system_prompt=agent_db.system_prompt,
-        mcp_servers=mcp_servers
+        model,
+        mcp_servers=mcp_servers,
+        system_prompt=agent_db.system_prompt
     )
     
     return agent_instance
