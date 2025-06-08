@@ -5,6 +5,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
+import json
 
 
 async def create_chat_session(db: AsyncSession, user_id: int, agent_id: int, title: str) -> ChatSession:
@@ -109,21 +110,26 @@ async def get_chat_session_messages(db: AsyncSession, chat_session_id: int) -> L
 async def get_messages_as_model_messages(db: AsyncSession, chat_session_id: int) -> List[ModelMessage]:
     """Get chat session messages in a format suitable for the agent"""
     messages = await get_chat_session_messages(db, chat_session_id)
-    model_messages_json = [
-        f'{{
+    model_messages_json = []
+    
+    for msg in messages:
+        message_type = "request" if msg.role == "user" else "response"
+        content_type = "user_prompt" if msg.role == "user" else "text"
+        timestamp = msg.timestamp.isoformat()
+        
+        message_json = {
             "type": "model_message",
-            "message_type": "{"request" if msg.role == "user" else "response"}",
+            "message_type": message_type,
             "parts": [
-                {{
-                    "type": "{"user_prompt" if msg.role == "user" else "text"}",
-                    "content": {repr(msg.content)},
-                    "timestamp": "{msg.timestamp.isoformat()}"
-                }}
+                {
+                    "type": content_type,
+                    "content": msg.content,
+                    "timestamp": timestamp
+                }
             ],
-            "timestamp": "{msg.timestamp.isoformat()}"
-        }}'
-        for msg in messages
-    ]
+            "timestamp": timestamp
+        }
+        model_messages_json.append(json.dumps(message_json))
     
     return ModelMessagesTypeAdapter.validate_json('[' + ','.join(model_messages_json) + ']')
 
