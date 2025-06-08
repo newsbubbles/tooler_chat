@@ -54,6 +54,8 @@ class Agent(SQLModel, table=True):
 
 class MCPServer(SQLModel, table=True):
     """MCP Server model to store MCP server information"""
+    __tablename__ = "mcp_server"
+    
     id: Optional[int] = Field(default=None, primary_key=True)
     uuid: UUID = Field(default_factory=uuid4, index=True, unique=True)
     user_id: int = Field(foreign_key="user.id")
@@ -70,6 +72,8 @@ class MCPServer(SQLModel, table=True):
 
 class AgentMCPServer(SQLModel, table=True):
     """Relationship table between Agent and MCP Server"""
+    __tablename__ = "agent_mcp_server"
+    
     agent_id: int = Field(foreign_key="agent.id", primary_key=True)
     mcp_server_id: int = Field(foreign_key="mcp_server.id", primary_key=True)
     is_active: bool = Field(default=True)
@@ -82,6 +86,8 @@ class AgentMCPServer(SQLModel, table=True):
 
 class ChatSession(SQLModel, table=True):
     """Chat Session model to store chat conversations"""
+    __tablename__ = "chat_session"
+    
     id: Optional[int] = Field(default=None, primary_key=True)
     uuid: UUID = Field(default_factory=uuid4, index=True, unique=True)
     user_id: int = Field(foreign_key="user.id")
@@ -100,7 +106,7 @@ class Message(SQLModel, table=True):
     """Message model to store chat messages"""
     id: Optional[int] = Field(default=None, primary_key=True)
     uuid: UUID = Field(default_factory=uuid4, index=True, unique=True)
-    chat_session_id: int = Field(foreign_key="chatsession.id")
+    chat_session_id: int = Field(foreign_key="chat_session.id")
     role: str  # 'user' or 'model'
     content: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
