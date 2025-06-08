@@ -36,13 +36,25 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
+# Configure CORS - make it permissive for development
+origins = [
+    "http://localhost:3000",           # Local React development
+    "http://localhost:34140",          # Local Docker frontend
+    "http://51.158.125.49:34140",      # Remote Docker frontend
+    "http://51.158.125.49:34130",      # Remote Docker backend
+    "http://51.158.125.49",           # Remote host
+    "http://localhost",                # Local host
+    "*"                               # Wildcard for development
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For production, specify the actual origins
+    allow_origins=origins,
+    allow_origin_regex=r"https?://.*",  # Allow any origin during development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include API routers
