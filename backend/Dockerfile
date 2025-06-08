@@ -24,4 +24,4 @@ ENV PYTHONUNBUFFERED=1
 ENV PORT=34130
 
 # Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${PORT}"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "34130"]

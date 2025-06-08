@@ -1,7 +1,7 @@
 from typing import AsyncGenerator
 from sqlmodel import SQLModel, create_engine
-from sqlmodel.ext.asyncio.session import AsyncSession, AsyncEngine
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 from sqlalchemy.orm import sessionmaker
 import os
 from contextlib import asynccontextmanager
