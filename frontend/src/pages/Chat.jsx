@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -14,26 +14,26 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Send as SendIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-} from '@mui/icons-material';
-import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { materialLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import remarkGfm from 'remark-gfm';
+} from "@mui/icons-material";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { materialLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import remarkGfm from "remark-gfm";
 
-import { useChatStore } from '../contexts/chatStore';
-import { useAgentsStore } from '../contexts/agentsStore';
+import { useChatStore } from "../contexts/chatStore";
+import { useAgentsStore } from "../contexts/agentsStore";
 
 export default function Chat() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
-  const [message, setMessage] = useState('');
-  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState("");
+  const [title, setTitle] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -53,16 +53,16 @@ export default function Chat() {
 
   // Load session when sessionId changes
   useEffect(() => {
-    if (sessionId && sessionId !== 'new') {
+    if (sessionId && sessionId !== "new") {
       setIsLoadingMessages(true);
       loadSession(sessionId).finally(() => {
         setIsLoadingMessages(false);
       });
-    } else if (sessionId === 'new' && selectedAgent) {
+    } else if (sessionId === "new" && selectedAgent) {
       // Clear any current session data for a new session
-      useChatStore.setState({ 
-        selectedSession: null, 
-        messages: [] 
+      useChatStore.setState({
+        selectedSession: null,
+        messages: [],
       });
     }
   }, [sessionId, loadSession, selectedAgent]);
@@ -74,7 +74,7 @@ export default function Chat() {
     } else if (selectedAgent) {
       setTitle(`New Chat with ${selectedAgent.name}`);
     } else {
-      setTitle('Select an agent to start a new chat');
+      setTitle("Select an agent to start a new chat");
     }
   }, [selectedSession, selectedAgent]);
 
@@ -84,12 +84,14 @@ export default function Chat() {
   }, [messages]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!message.trim() || !selectedAgent) return;
+
+    console.log(selectedAgent);
 
     // Create a new session if needed
     if (!selectedSession) {
@@ -107,7 +109,7 @@ export default function Chat() {
 
     // Send message
     await sendMessage(message, selectedSession.uuid);
-    setMessage('');
+    setMessage("");
   };
 
   const handleTitleUpdate = async () => {
@@ -120,13 +122,13 @@ export default function Chat() {
   const handleDeleteSession = async () => {
     if (selectedSession) {
       await deleteSession(selectedSession.uuid);
-      navigate('/chat');
+      navigate("/chat");
     }
     setDeleteDialogOpen(false);
   };
 
   const CodeBlock = ({ node, inline, className, children, ...props }) => {
-    const match = /language-(\w+)/.exec(className || '');
+    const match = /language-(\w+)/.exec(className || "");
     return !inline && match ? (
       <SyntaxHighlighter
         style={materialLight}
@@ -134,7 +136,7 @@ export default function Chat() {
         PreTag="div"
         {...props}
       >
-        {String(children).replace(/\n$/, '')}
+        {String(children).replace(/\n$/, "")}
       </SyntaxHighlighter>
     ) : (
       <code className={className} {...props}>
@@ -147,11 +149,11 @@ export default function Chat() {
     return (
       <Box
         sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
           p: 4,
         }}
       >
@@ -159,28 +161,36 @@ export default function Chat() {
           Select an agent to start chatting
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Use the sidebar on the left to choose an agent and create a new chat session.
+          Use the sidebar on the left to choose an agent and create a new chat
+          session.
         </Typography>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        position: "relative",
+      }}
+    >
       {/* Chat header */}
       <Paper
         elevation={1}
         sx={{
           p: 2,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           borderRadius: 0,
           zIndex: 10,
         }}
       >
         {isEditingTitle ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
             <TextField
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -194,7 +204,7 @@ export default function Chat() {
             </Button>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
             <Typography variant="h6" sx={{ mr: 1 }}>
               {title}
             </Typography>
@@ -219,17 +229,17 @@ export default function Chat() {
       <Box
         sx={{
           flex: 1,
-          overflow: 'auto',
+          overflow: "auto",
           p: 2,
-          backgroundColor: '#f9f9f9',
+          backgroundColor: "#f9f9f9",
         }}
       >
         {isLoadingMessages ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
             <CircularProgress />
           </Box>
         ) : messages.length === 0 ? (
-          <Box sx={{ textAlign: 'center', p: 4 }}>
+          <Box sx={{ textAlign: "center", p: 4 }}>
             <Typography variant="body1" color="text.secondary">
               No messages yet. Start the conversation!
             </Typography>
@@ -240,24 +250,29 @@ export default function Chat() {
               key={msg.uuid}
               sx={{
                 mb: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                display: "flex",
+                flexDirection: "column",
+                alignItems: msg.role === "user" ? "flex-end" : "flex-start",
               }}
             >
               <Paper
                 elevation={1}
                 sx={{
                   p: 2,
-                  maxWidth: '80%',
-                  backgroundColor: msg.role === 'user' ? '#e3f2fd' : 'white',
+                  maxWidth: "80%",
+                  backgroundColor: msg.role === "user" ? "#e3f2fd" : "white",
                   borderRadius: 2,
                 }}
               >
-                <Typography variant="caption" display="block" gutterBottom color="text.secondary">
-                  {msg.role === 'user' ? 'You' : selectedAgent?.name || 'Agent'}
+                <Typography
+                  variant="caption"
+                  display="block"
+                  gutterBottom
+                  color="text.secondary"
+                >
+                  {msg.role === "user" ? "You" : selectedAgent?.name || "Agent"}
                 </Typography>
-                <Box sx={{ '& pre': { maxWidth: '100%', overflow: 'auto' } }}>
+                <Box sx={{ "& pre": { maxWidth: "100%", overflow: "auto" } }}>
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -282,10 +297,10 @@ export default function Chat() {
         onSubmit={handleSendMessage}
         sx={{
           p: 2,
-          display: 'flex',
-          alignItems: 'center',
+          display: "flex",
+          alignItems: "center",
           borderRadius: 0,
-          borderTop: '1px solid rgba(0, 0, 0, 0.12)',
+          borderTop: "1px solid rgba(0, 0, 0, 0.12)",
         }}
         elevation={4}
       >
@@ -299,7 +314,7 @@ export default function Chat() {
           maxRows={4}
           disabled={isLoading}
         />
-        <Box sx={{ ml: 1, display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ ml: 1, display: "flex", alignItems: "center" }}>
           {isLoading ? (
             <CircularProgress size={24} sx={{ mx: 1 }} />
           ) : (
@@ -316,10 +331,16 @@ export default function Chat() {
       </Paper>
 
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
         <DialogTitle>Delete Chat Session</DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to delete this chat session? This action cannot be undone.</Typography>
+          <Typography>
+            Are you sure you want to delete this chat session? This action
+            cannot be undone.
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
