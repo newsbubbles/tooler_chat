@@ -22,17 +22,12 @@ class AgentUpdate(BaseModel):
 
 class AgentResponse(AgentBase):
     uuid: UUID
-    id: UUID = Field(None, description="Agent's UUID for compatibility")  # Added field for frontend compatibility
     is_default: bool
     created_at: datetime
     updated_at: datetime
     
     class Config:
         from_attributes = True
-        
-    def model_post_init(self, __context):
-        # Ensure id is set to the uuid value
-        self.id = self.uuid
 
 
 class AgentDetailResponse(AgentResponse):
