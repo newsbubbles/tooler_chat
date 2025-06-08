@@ -1,10 +1,14 @@
 from app.services.agent_service import get_default_agent, create_agent
+from app.services.user_service import get_user_by_username
 from app.db.database import get_db_context
 import os
 import logging
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# System username
+SYSTEM_USERNAME = os.getenv("SYSTEM_USERNAME", "system")
 
 # Default Tooler agent system prompt
 TOOLER_AGENT_PROMPT = """
@@ -52,18 +56,28 @@ You are Tooler, a specialized agent focused on building custom API clients based
 async def init_tooler_agent():
     """Initialize the default Tooler agent if it doesn't exist"""
     async with get_db_context() as db:
+        # First check if default agent already exists
         default_agent = await get_default_agent(db)
         
         if not default_agent:
+            # Get system user
+            system_user = await get_user_by_username(db, SYSTEM_USERNAME)
+            
+            if not system_user:
+                logger.error(f"Cannot create default agent - system user '{SYSTEM_USERNAME}' not found")
+                return None
+            
             logger.info("Creating default Tooler agent")
             await create_agent(
                 db=db,
-                user_id=1,  # System user ID
+                user_id=system_user.id,
                 name="Tooler",
                 description="The default Tooler agent for building custom API clients",
                 system_prompt=TOOLER_AGENT_PROMPT,
                 is_default=True
             )
             logger.info("Default Tooler agent created successfully")
+            return True
         else:
             logger.info("Default Tooler agent already exists")
+            return True

@@ -5,7 +5,7 @@ import logging
 
 from app.api import auth, users, agents, mcp_servers, chat
 from app.db.database import create_db_and_tables
-from app.core.agent_init import init_tooler_agent
+from app.core.system_init import init_system
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,8 +20,8 @@ async def lifespan(app: FastAPI):
     # Create database tables if they don't exist
     await create_db_and_tables()
     
-    # Initialize the default Tooler agent if it doesn't exist
-    await init_tooler_agent()
+    # Initialize the system (users and default agents)
+    await init_system()
     
     yield
     
