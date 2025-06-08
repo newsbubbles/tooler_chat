@@ -18,17 +18,17 @@ services:
     networks:
       - app-network
 
-  frontend:
-    build: ./frontend
-    ports:
-      - "${FRONTEND_PORT:-34140}:80"
-    environment:
-      - BACKEND_URL=http://backend:${BACKEND_PORT:-34130}
-      - REACT_APP_API_URL=/api
-    depends_on:
-      - backend
-    networks:
-      - app-network
+#  frontend:
+#    build: ./frontend
+#    ports:
+#      - "${FRONTEND_PORT:-34140}:80"
+#    environment:
+#      - BACKEND_URL=http://backend:${BACKEND_PORT:-34130}
+#      - REACT_APP_API_URL=/api
+#    depends_on:
+#      - backend
+#    networks:
+#      - app-network
 
   db:
     image: postgres:14
