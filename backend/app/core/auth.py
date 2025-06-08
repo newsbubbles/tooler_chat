@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 import jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -9,10 +8,7 @@ import os
 
 from app.db.database import get_db
 from app.models.base import User, Session
-from app.services.user_service import get_user_by_username
-
-# Configure password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from app.core.security_utils import verify_password
 
 # JWT settings
 SECRET_KEY = os.getenv("SECRET_KEY", "very-secret-key-for-development-only")
@@ -22,18 +18,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hashed password"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Generate password hash"""
-    return pwd_context.hash(password)
-
-
 async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
     """Authenticate user by username and password"""
+    from app.services.user_service import get_user_by_username
     user = await get_user_by_username(db, username)
     if not user:
         return None
@@ -74,6 +61,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         raise credentials_exception
     
     # Get the user associated with the session
+    from app.services.user_service import get_user_by_id
     user = await get_user_by_id(db, session.user_id)
     if user is None or not user.is_active:
         raise credentials_exception

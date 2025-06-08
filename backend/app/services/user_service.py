@@ -1,7 +1,7 @@
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.base import User
-from app.core.auth import get_password_hash
+from app.core.security_utils import get_password_hash
 from typing import List, Optional
 from uuid import UUID
 
