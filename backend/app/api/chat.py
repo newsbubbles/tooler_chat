@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
-from typing import List
+from typing import List, Dict, Any
 import json
 from datetime import datetime, timezone
+from uuid import UUID
 
 from app.db.database import get_db
 from app.core.auth import get_current_active_user
@@ -18,7 +19,7 @@ from app.services.chat_service import (
     delete_chat_session, create_message, get_chat_session_messages,
     get_messages_as_model_messages, add_model_messages
 )
-from app.services.agent_service import get_agent_by_id, get_agent_mcp_servers
+from app.services.agent_service import get_agent_by_id, get_agent_mcp_servers, get_agent_by_uuid
 from app.services.mcp_server_service import get_mcp_server_by_id
 
 from pydantic_ai import Agent, RunContext
@@ -29,6 +30,7 @@ from pydantic_ai.agent import AgentRunResult
 import os
 import asyncio
 import tempfile
+from uuid import UUID
 
 router = APIRouter(tags=["chat"])
 
@@ -37,15 +39,15 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 
-async def get_agent_instance(agent_id: int, db: AsyncSession):
+async def get_agent_instance(agent_uuid: str, db: AsyncSession):
     """Get a configured Agent instance with associated MCP servers"""
     # Get the agent from the database
-    agent_db = await get_agent_by_id(db, agent_id)
+    agent_db = await get_agent_by_uuid(db, agent_uuid)
     if not agent_db:
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Get associated MCP servers
-    mcp_servers_db = await get_agent_mcp_servers(db, agent_id)
+    mcp_servers_db = await get_agent_mcp_servers(db, agent_db.id)
     mcp_servers = []
     
     # Prepare environment variables for MCP servers
@@ -103,8 +105,11 @@ async def create_new_chat_session(
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new chat session"""
+    # Extract UUID string and convert to UUID object
+    agent_uuid = session_data.agent_id
+    
     # Verify agent exists and user has access to it
-    agent = await get_agent_by_id(db, session_data.agent_id)
+    agent = await get_agent_by_uuid(db, agent_uuid)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     
@@ -119,28 +124,60 @@ async def create_new_chat_session(
         title=session_data.title
     )
     
-    return chat_session
+    # Create a response dictionary with the proper UUIDs
+    response = {
+        "uuid": chat_session.uuid,
+        "id": chat_session.uuid,  # Use UUID for id as well
+        "title": chat_session.title,
+        "agent_id": agent.uuid,  # Use agent's UUID rather than database ID
+        "created_at": chat_session.created_at,
+        "updated_at": chat_session.updated_at
+    }
+    
+    # Now validate the response
+    return ChatSessionResponse.model_validate(response)
 
 
 @router.get("/chat/sessions", response_model=List[ChatSessionResponse])
 async def get_chat_sessions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-    agent_id: int = None
+    agent_uuid: str = None
 ):
     """Get all chat sessions for the current user, optionally filtered by agent"""
-    if agent_id:
+    if agent_uuid:
         # Verify agent exists and user has access to it
-        agent = await get_agent_by_id(db, agent_id)
+        agent = await get_agent_by_uuid(db, agent_uuid)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
         
         if not agent.is_default and agent.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Not authorized to access this agent's sessions")
         
-        return await get_user_agent_chat_sessions(db, current_user.id, agent_id)
+        sessions = await get_user_agent_chat_sessions(db, current_user.id, agent.id)
     else:
-        return await get_user_chat_sessions(db, current_user.id)
+        sessions = await get_user_chat_sessions(db, current_user.id)
+    
+    # Process each session to use UUIDs instead of integer IDs
+    result = []
+    for session in sessions:
+        # Get agent to get its UUID
+        agent = await get_agent_by_id(db, session.agent_id)
+        agent_uuid_str = agent.uuid if agent else None
+        
+        # Create response dictionary with proper UUID conversion
+        session_data = {
+            "uuid": session.uuid,
+            "id": session.uuid,  # Use UUID for id as well
+            "title": session.title,
+            "agent_id": agent_uuid_str,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at
+        }
+        
+        result.append(ChatSessionResponse.model_validate(session_data))
+    
+    return result
 
 
 @router.get("/chat/sessions/{session_uuid}", response_model=ChatSessionDetailResponse)
@@ -161,11 +198,33 @@ async def get_chat_session(
     # Get messages for this chat session
     messages = await get_chat_session_messages(db, chat_session.id)
     
-    # Create detailed response
-    response = ChatSessionDetailResponse.model_validate(chat_session)
-    response.messages = [MessageResponse.model_validate(m) for m in messages]
+    # Get agent to get its UUID
+    agent = await get_agent_by_id(db, chat_session.agent_id)
+    agent_uuid_str = agent.uuid if agent else None
     
-    return response
+    # Create response dictionary with proper UUID conversion
+    session_data = {
+        "uuid": chat_session.uuid,
+        "id": chat_session.uuid,  # Use UUID for id as well
+        "title": chat_session.title,
+        "agent_id": agent_uuid_str,
+        "created_at": chat_session.created_at,
+        "updated_at": chat_session.updated_at,
+        "messages": []
+    }
+    
+    # Process messages
+    for message in messages:
+        msg_data = {
+            "uuid": message.uuid,
+            "id": message.uuid,  # Use UUID for id as well
+            "role": message.role,
+            "content": message.content,
+            "timestamp": message.timestamp
+        }
+        session_data["messages"].append(MessageResponse.model_validate(msg_data))
+    
+    return ChatSessionDetailResponse.model_validate(session_data)
 
 
 @router.put("/chat/sessions/{session_uuid}", response_model=ChatSessionResponse)
@@ -188,7 +247,21 @@ async def update_existing_chat_session(
     update_data = session_data.model_dump(exclude_unset=True)
     updated_chat_session = await update_chat_session(db, chat_session.id, **update_data)
     
-    return updated_chat_session
+    # Get agent to get its UUID
+    agent = await get_agent_by_id(db, updated_chat_session.agent_id)
+    agent_uuid_str = agent.uuid if agent else None
+    
+    # Create response dictionary with proper UUID conversion
+    response_data = {
+        "uuid": updated_chat_session.uuid,
+        "id": updated_chat_session.uuid,  # Use UUID for id as well
+        "title": updated_chat_session.title,
+        "agent_id": agent_uuid_str,
+        "created_at": updated_chat_session.created_at,
+        "updated_at": updated_chat_session.updated_at
+    }
+    
+    return ChatSessionResponse.model_validate(response_data)
 
 
 @router.delete("/chat/sessions/{session_uuid}", status_code=status.HTTP_204_NO_CONTENT)
@@ -236,7 +309,11 @@ async def create_chat_message(
     )
     
     # Get agent and run it to generate a response
-    agent_instance = await get_agent_instance(chat_session.agent_id, db)
+    agent = await get_agent_by_id(db, chat_session.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+        
+    agent_instance = await get_agent_instance(str(agent.uuid), db)
     message_history = await get_messages_as_model_messages(db, chat_session.id)
     
     async with agent_instance.run_mcp_servers():
@@ -252,10 +329,25 @@ async def create_chat_message(
     # Get the last message which should be the model's response
     messages = await get_chat_session_messages(db, chat_session.id)
     if messages and messages[-1].role == "model":
-        return messages[-1]
+        # Convert to proper response model with UUID
+        response_data = {
+            "uuid": messages[-1].uuid,
+            "id": messages[-1].uuid,
+            "role": messages[-1].role,
+            "content": messages[-1].content,
+            "timestamp": messages[-1].timestamp
+        }
+        return MessageResponse.model_validate(response_data)
     
     # Fallback to user message if something went wrong
-    return user_message
+    response_data = {
+        "uuid": user_message.uuid,
+        "id": user_message.uuid,
+        "role": user_message.role,
+        "content": user_message.content,
+        "timestamp": user_message.timestamp
+    }
+    return MessageResponse.model_validate(response_data)
 
 
 @router.post("/chat/sessions/{session_uuid}/messages/stream")
@@ -287,11 +379,24 @@ async def stream_chat_message(
         yield json.dumps({
             "role": "user",
             "content": message_data.content,
-            "timestamp": user_message.timestamp.isoformat()
+            "timestamp": user_message.timestamp.isoformat(),
+            "id": str(user_message.uuid)  # UUID as string
         }).encode("utf-8") + b"\n"
         
         # Get agent and message history
-        agent_instance = await get_agent_instance(chat_session.agent_id, db)
+        agent = await get_agent_by_id(db, chat_session.agent_id)
+        if not agent:
+            error_msg = "Agent not found"
+            yield json.dumps({
+                "role": "model",
+                "content": error_msg,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "error": True,
+                "id": "error"  # Special ID for errors
+            }).encode("utf-8") + b"\n"
+            return
+            
+        agent_instance = await get_agent_instance(str(agent.uuid), db)
         message_history = await get_messages_as_model_messages(db, chat_session.id)
         model_message = None
         
@@ -317,7 +422,8 @@ async def stream_chat_message(
                         yield json.dumps({
                             "role": "model",
                             "content": complete_response,
-                            "timestamp": model_message.timestamp.isoformat()
+                            "timestamp": model_message.timestamp.isoformat(),
+                            "id": str(model_message.uuid)  # UUID as string
                         }).encode("utf-8") + b"\n"
                     
                     # Update the model message with the complete response
@@ -336,7 +442,7 @@ async def stream_chat_message(
             error_message = f"Error processing request: {str(e)}"
             
             # Create an error message in the database
-            await create_message(
+            error_msg = await create_message(
                 db=db,
                 chat_session_id=chat_session.id,
                 role="model",
@@ -348,7 +454,8 @@ async def stream_chat_message(
                 "role": "model",
                 "content": error_message,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "error": True
+                "error": True,
+                "id": str(error_msg.uuid)  # UUID as string
             }).encode("utf-8") + b"\n"
     
     return StreamingResponse(stream_response(), media_type="text/plain")
