@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
-from typing import List
+from typing import List, Dict, Any
+from pydantic import parse_obj_as
 
 from app.db.database import get_db
 from app.core.auth import get_current_active_user
@@ -17,7 +18,7 @@ from app.services.mcp_server_service import get_mcp_server_by_id
 router = APIRouter(tags=["agents"])
 
 
-@router.post("/agents", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/agents", response_model=None, status_code=status.HTTP_201_CREATED)
 async def create_new_agent(
     agent_data: AgentCreate,
     db: AsyncSession = Depends(get_db),
@@ -32,20 +33,30 @@ async def create_new_agent(
         description=agent_data.description,
         is_default=False  # User-created agents are never default
     )
-    return agent
+    
+    # Create response with added id field
+    response = AgentResponse.model_validate(agent)
+    return {**response.model_dump(), "id": str(agent.uuid)}
 
 
-@router.get("/agents", response_model=List[AgentResponse])
+@router.get("/agents", response_model=None)
 async def get_agents(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get all agents for the current user, including the default Tooler agent"""
     agents = await get_user_agents(db, current_user.id)
-    return agents
+    
+    # Create response with added id field for each agent
+    response = []
+    for agent in agents:
+        agent_response = AgentResponse.model_validate(agent)
+        response.append({**agent_response.model_dump(), "id": str(agent.uuid)})
+    
+    return response
 
 
-@router.get("/agents/{agent_uuid}", response_model=AgentDetailResponse)
+@router.get("/agents/{agent_uuid}", response_model=None)
 async def get_agent(
     agent_uuid: str,
     db: AsyncSession = Depends(get_db),
@@ -67,10 +78,11 @@ async def get_agent(
     response = AgentDetailResponse.model_validate(agent)
     response.mcp_servers = [MCPServerResponse.model_validate(s) for s in mcp_servers]
     
-    return response
+    # Add id field
+    return {**response.model_dump(), "id": str(agent.uuid)}
 
 
-@router.put("/agents/{agent_uuid}", response_model=AgentResponse)
+@router.put("/agents/{agent_uuid}", response_model=None)
 async def update_existing_agent(
     agent_uuid: str,
     agent_data: AgentUpdate,
@@ -94,7 +106,9 @@ async def update_existing_agent(
     update_data = agent_data.model_dump(exclude_unset=True)
     updated_agent = await update_agent(db, agent.id, **update_data)
     
-    return updated_agent
+    # Create response with added id field
+    response = AgentResponse.model_validate(updated_agent)
+    return {**response.model_dump(), "id": str(updated_agent.uuid)}
 
 
 @router.delete("/agents/{agent_uuid}", status_code=status.HTTP_204_NO_CONTENT)
@@ -121,7 +135,7 @@ async def delete_existing_agent(
         raise HTTPException(status_code=500, detail="Failed to delete agent")
 
 
-@router.post("/agents/{agent_uuid}/mcp-servers", response_model=AgentResponse)
+@router.post("/agents/{agent_uuid}/mcp-servers", response_model=None)
 async def add_mcp_server(
     agent_uuid: str,
     data: AgentMCPServerAdd,
@@ -148,10 +162,12 @@ async def add_mcp_server(
     # Add MCP server to agent
     await add_mcp_server_to_agent(db, agent.id, mcp_server.id)
     
-    return agent
+    # Create response with added id field
+    response = AgentResponse.model_validate(agent)
+    return {**response.model_dump(), "id": str(agent.uuid)}
 
 
-@router.delete("/agents/{agent_uuid}/mcp-servers", response_model=AgentResponse)
+@router.delete("/agents/{agent_uuid}/mcp-servers", response_model=None)
 async def remove_mcp_server(
     agent_uuid: str,
     data: AgentMCPServerRemove,
@@ -172,4 +188,6 @@ async def remove_mcp_server(
     if not result:
         raise HTTPException(status_code=404, detail="MCP server not associated with this agent")
     
-    return agent
+    # Create response with added id field
+    response = AgentResponse.model_validate(agent)
+    return {**response.model_dump(), "id": str(agent.uuid)}
