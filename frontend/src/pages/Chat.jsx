@@ -309,6 +309,14 @@ export default function Chat() {
           fullWidth
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (message.trim() && selectedAgent && !isLoading) {
+                handleSendMessage(e);
+              }
+            }
+          }}
           placeholder="Type a message..."
           variant="outlined"
           multiline
