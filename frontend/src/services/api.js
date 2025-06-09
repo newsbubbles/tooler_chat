@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://51.158.125.49:34130/",
+  baseURL: process.env.REACT_APP_API_URL || "https://app.xsus.ai/",
   headers: {
     "Content-Type": "application/json",
   },
