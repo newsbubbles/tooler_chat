@@ -4,6 +4,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Dict, Any
 import json
 from datetime import datetime, timezone
+from uuid import UUID
 
 from app.db.database import get_db
 from app.core.auth import get_current_active_user
@@ -97,7 +98,7 @@ async def get_agent_instance(agent_uuid: str, db: AsyncSession):
     return agent_instance
 
 
-@router.post("/chat/sessions", response_model=None, status_code=status.HTTP_201_CREATED)
+@router.post("/chat/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_chat_session(
     session_data: ChatSessionCreate,
     db: AsyncSession = Depends(get_db),
@@ -123,16 +124,21 @@ async def create_new_chat_session(
         title=session_data.title
     )
     
-    # Return response with UUID string representation
-    response = ChatSessionResponse.model_validate(chat_session)
-    return {
-        **response.model_dump(),
-        "id": str(chat_session.uuid),
-        "agent_id": str(agent.uuid)  # Use agent's UUID instead of DB ID
+    # Create a response dictionary with the proper UUIDs
+    response = {
+        "uuid": chat_session.uuid,
+        "id": chat_session.uuid,  # Use UUID for id as well
+        "title": chat_session.title,
+        "agent_id": agent.uuid,  # Use agent's UUID rather than database ID
+        "created_at": chat_session.created_at,
+        "updated_at": chat_session.updated_at
     }
+    
+    # Now validate the response
+    return ChatSessionResponse.model_validate(response)
 
 
-@router.get("/chat/sessions", response_model=None)
+@router.get("/chat/sessions", response_model=List[ChatSessionResponse])
 async def get_chat_sessions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -157,20 +163,24 @@ async def get_chat_sessions(
     for session in sessions:
         # Get agent to get its UUID
         agent = await get_agent_by_id(db, session.agent_id)
-        agent_uuid_str = str(agent.uuid) if agent else None
+        agent_uuid_str = agent.uuid if agent else None
         
-        # Create response
-        session_response = ChatSessionResponse.model_validate(session)
-        result.append({
-            **session_response.model_dump(),
-            "id": str(session.uuid),
-            "agent_id": agent_uuid_str
-        })
+        # Create response dictionary with proper UUID conversion
+        session_data = {
+            "uuid": session.uuid,
+            "id": session.uuid,  # Use UUID for id as well
+            "title": session.title,
+            "agent_id": agent_uuid_str,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at
+        }
+        
+        result.append(ChatSessionResponse.model_validate(session_data))
     
     return result
 
 
-@router.get("/chat/sessions/{session_uuid}", response_model=None)
+@router.get("/chat/sessions/{session_uuid}", response_model=ChatSessionDetailResponse)
 async def get_chat_session(
     session_uuid: str,
     db: AsyncSession = Depends(get_db),
@@ -190,28 +200,34 @@ async def get_chat_session(
     
     # Get agent to get its UUID
     agent = await get_agent_by_id(db, chat_session.agent_id)
-    agent_uuid_str = str(agent.uuid) if agent else None
+    agent_uuid_str = agent.uuid if agent else None
     
-    # Create detailed response
-    response = ChatSessionDetailResponse.model_validate(chat_session)
-    processed_messages = []
-    
-    for message in messages:
-        msg_response = MessageResponse.model_validate(message)
-        processed_messages.append({
-            **msg_response.model_dump(),
-            "id": str(message.uuid)
-        })
-    
-    return {
-        **response.model_dump(),
-        "id": str(chat_session.uuid),
+    # Create response dictionary with proper UUID conversion
+    session_data = {
+        "uuid": chat_session.uuid,
+        "id": chat_session.uuid,  # Use UUID for id as well
+        "title": chat_session.title,
         "agent_id": agent_uuid_str,
-        "messages": processed_messages
+        "created_at": chat_session.created_at,
+        "updated_at": chat_session.updated_at,
+        "messages": []
     }
+    
+    # Process messages
+    for message in messages:
+        msg_data = {
+            "uuid": message.uuid,
+            "id": message.uuid,  # Use UUID for id as well
+            "role": message.role,
+            "content": message.content,
+            "timestamp": message.timestamp
+        }
+        session_data["messages"].append(MessageResponse.model_validate(msg_data))
+    
+    return ChatSessionDetailResponse.model_validate(session_data)
 
 
-@router.put("/chat/sessions/{session_uuid}", response_model=None)
+@router.put("/chat/sessions/{session_uuid}", response_model=ChatSessionResponse)
 async def update_existing_chat_session(
     session_uuid: str,
     session_data: ChatSessionUpdate,
@@ -233,15 +249,19 @@ async def update_existing_chat_session(
     
     # Get agent to get its UUID
     agent = await get_agent_by_id(db, updated_chat_session.agent_id)
-    agent_uuid_str = str(agent.uuid) if agent else None
+    agent_uuid_str = agent.uuid if agent else None
     
-    # Create response
-    response = ChatSessionResponse.model_validate(updated_chat_session)
-    return {
-        **response.model_dump(),
-        "id": str(updated_chat_session.uuid),
-        "agent_id": agent_uuid_str
+    # Create response dictionary with proper UUID conversion
+    response_data = {
+        "uuid": updated_chat_session.uuid,
+        "id": updated_chat_session.uuid,  # Use UUID for id as well
+        "title": updated_chat_session.title,
+        "agent_id": agent_uuid_str,
+        "created_at": updated_chat_session.created_at,
+        "updated_at": updated_chat_session.updated_at
     }
+    
+    return ChatSessionResponse.model_validate(response_data)
 
 
 @router.delete("/chat/sessions/{session_uuid}", status_code=status.HTTP_204_NO_CONTENT)
@@ -264,7 +284,7 @@ async def delete_existing_chat_session(
         raise HTTPException(status_code=500, detail="Failed to delete chat session")
 
 
-@router.post("/chat/sessions/{session_uuid}/messages", response_model=None)
+@router.post("/chat/sessions/{session_uuid}/messages", response_model=MessageResponse)
 async def create_chat_message(
     session_uuid: str,
     message_data: MessageCreate,
@@ -309,18 +329,25 @@ async def create_chat_message(
     # Get the last message which should be the model's response
     messages = await get_chat_session_messages(db, chat_session.id)
     if messages and messages[-1].role == "model":
-        message_response = MessageResponse.model_validate(messages[-1])
-        return {
-            **message_response.model_dump(),
-            "id": str(messages[-1].uuid)
+        # Convert to proper response model with UUID
+        response_data = {
+            "uuid": messages[-1].uuid,
+            "id": messages[-1].uuid,
+            "role": messages[-1].role,
+            "content": messages[-1].content,
+            "timestamp": messages[-1].timestamp
         }
+        return MessageResponse.model_validate(response_data)
     
     # Fallback to user message if something went wrong
-    message_response = MessageResponse.model_validate(user_message)
-    return {
-        **message_response.model_dump(),
-        "id": str(user_message.uuid)
+    response_data = {
+        "uuid": user_message.uuid,
+        "id": user_message.uuid,
+        "role": user_message.role,
+        "content": user_message.content,
+        "timestamp": user_message.timestamp
     }
+    return MessageResponse.model_validate(response_data)
 
 
 @router.post("/chat/sessions/{session_uuid}/messages/stream")
@@ -353,7 +380,7 @@ async def stream_chat_message(
             "role": "user",
             "content": message_data.content,
             "timestamp": user_message.timestamp.isoformat(),
-            "id": str(user_message.uuid)  # Added UUID as string
+            "id": str(user_message.uuid)  # UUID as string
         }).encode("utf-8") + b"\n"
         
         # Get agent and message history
@@ -396,7 +423,7 @@ async def stream_chat_message(
                             "role": "model",
                             "content": complete_response,
                             "timestamp": model_message.timestamp.isoformat(),
-                            "id": str(model_message.uuid)  # Added UUID as string
+                            "id": str(model_message.uuid)  # UUID as string
                         }).encode("utf-8") + b"\n"
                     
                     # Update the model message with the complete response
@@ -428,7 +455,7 @@ async def stream_chat_message(
                 "content": error_message,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": True,
-                "id": str(error_msg.uuid)  # Added UUID as string
+                "id": str(error_msg.uuid)  # UUID as string
             }).encode("utf-8") + b"\n"
     
     return StreamingResponse(stream_response(), media_type="text/plain")
