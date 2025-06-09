@@ -113,23 +113,30 @@ async def get_messages_as_model_messages(db: AsyncSession, chat_session_id: int)
     model_messages_json = []
     
     for msg in messages:
-        message_type = "request" if msg.role == "user" else "response"
-        content_type = "user_prompt" if msg.role == "user" else "text"
-        timestamp = msg.timestamp.isoformat()
-        
-        message_json = {
-            "type": "model_message",
-            "message_type": message_type,
-            "parts": [
-                {
-                    "type": content_type,
-                    "content": msg.content,
-                    "timestamp": timestamp
-                }
-            ],
-            "timestamp": timestamp
-        }
+        # Use the correct format with 'kind' as the discriminator field
+        if msg.role == "user":
+            # User messages use ModelRequest format
+            message_json = {
+                "kind": "request",  # Use 'kind' instead of 'message_type'
+                "request": {
+                    "user_prompt": msg.content
+                },
+                "timestamp": msg.timestamp.isoformat()
+            }
+        else:
+            # Model messages use ModelResponse format
+            message_json = {
+                "kind": "response",  # Use 'kind' instead of 'message_type'
+                "response": {
+                    "text": msg.content
+                },
+                "timestamp": msg.timestamp.isoformat()
+            }
         model_messages_json.append(json.dumps(message_json))
+    
+    # If there are no messages, return an empty list
+    if not model_messages_json:
+        return []
     
     return ModelMessagesTypeAdapter.validate_json('[' + ','.join(model_messages_json) + ']')
 
@@ -140,9 +147,13 @@ async def add_model_messages(db: AsyncSession, chat_session_id: int, model_messa
     created_messages = []
     
     for msg in model_messages:
-        first_part = msg.parts[0]
-        role = "user" if msg.__pydantic_private__.message_type == "request" else "model"
-        content = first_part.content
+        # Handle the correct format with 'kind' as discriminator
+        if msg.kind == "request":
+            role = "user"
+            content = msg.request.user_prompt
+        else:  # response
+            role = "model"
+            content = msg.response.text
         
         message = await create_message(
             db=db,
