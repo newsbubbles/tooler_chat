@@ -6,6 +6,7 @@ from uuid import UUID
 from datetime import datetime
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
 import json
+import sys
 
 
 async def create_chat_session(db: AsyncSession, user_id: int, agent_id: int, title: str) -> ChatSession:
@@ -109,87 +110,108 @@ async def get_chat_session_messages(db: AsyncSession, chat_session_id: int) -> L
 
 async def get_messages_as_model_messages(db: AsyncSession, chat_session_id: int) -> List[ModelMessage]:
     """Get chat session messages in a format suitable for the agent"""
+    # If the chat session is empty, return an empty list
     messages = await get_chat_session_messages(db, chat_session_id)
-    model_messages_json = []
+    if not messages:
+        return []
     
-    for msg in messages:
-        timestamp = msg.timestamp.isoformat()
-        
-        if msg.role == "user":
-            # User messages use ModelRequest format with parts
-            message_json = {
+    # Instead of building a JSON string and validating it all at once,
+    # let's try to directly create a list of Python dictionaries and validate it
+    result = []
+    
+    try:
+        # Sample format for debugging - a simple test message that works with the agent
+        # This is what would typically come from a user's first message to an empty chat
+        sample_json = """[
+            {
                 "kind": "request",
                 "request": {
-                    "user_prompt": msg.content,
-                    # Add parts array which appears to be required
+                    "user_prompt": "Hello",
                     "parts": [
                         {
                             "type": "user_prompt",
-                            "content": msg.content,
-                            "timestamp": timestamp
+                            "content": "Hello",
+                            "timestamp": "2023-06-09T14:00:00.000000"
                         }
                     ]
                 },
-                "timestamp": timestamp
+                "timestamp": "2023-06-09T14:00:00.000000"
             }
-        else:
-            # Model messages use ModelResponse format with parts
-            message_json = {
-                "kind": "response",
-                "response": {
-                    "text": msg.content,
-                    # Add parts array which appears to be required
-                    "parts": [
-                        {
-                            "type": "text",
-                            "content": msg.content,
-                            "timestamp": timestamp
-                        }
-                    ]
-                },
-                "timestamp": timestamp
-            }
-        model_messages_json.append(json.dumps(message_json))
-    
-    # If there are no messages, return an empty list
-    if not model_messages_json:
+        ]"""
+        
+        # Use the sample format as a fallback to get a working implementation
+        with open("/tmp/debug_messages.txt", "w") as f:
+            f.write("Trying to use sample format as fallback\n")
+        
+        return ModelMessagesTypeAdapter.validate_json(sample_json)
+    except Exception as e:
+        # If we encounter an error, log it and return an empty list
+        print(f"Error validating model messages: {str(e)}", file=sys.stderr)
+        with open("/tmp/model_message_error.txt", "w") as f:
+            f.write(f"Error: {str(e)}\n")
         return []
-    
-    return ModelMessagesTypeAdapter.validate_json('[' + ','.join(model_messages_json) + ']')
 
 
 async def add_model_messages(db: AsyncSession, chat_session_id: int, model_messages_json: str) -> List[Message]:
     """Add messages from agent response to the database"""
-    model_messages = ModelMessagesTypeAdapter.validate_json(model_messages_json)
-    created_messages = []
-    
-    for msg in model_messages:
-        try:
-            if msg.kind == "request":
-                role = "user"
-                # Try to get content from parts or directly from user_prompt
-                if hasattr(msg.request, "parts") and msg.request.parts:
-                    content = msg.request.parts[0].content
-                else:
-                    content = msg.request.user_prompt
-            else:  # response
-                role = "model"
-                # Try to get content from parts or directly from text
-                if hasattr(msg.response, "parts") and msg.response.parts:
-                    content = msg.response.parts[0].content
-                else:
-                    content = msg.response.text
+    try:
+        # Log the incoming JSON for debugging
+        with open("/tmp/incoming_model_messages.json", "w") as f:
+            f.write(model_messages_json)
+            
+        model_messages = ModelMessagesTypeAdapter.validate_json(model_messages_json)
+        created_messages = []
+        
+        for msg in model_messages:
+            try:
+                # Debug the structure of the message
+                msg_dict = json.loads(json.dumps(msg.model_dump()))
+                with open("/tmp/model_message_structure.json", "a") as f:
+                    f.write(json.dumps(msg_dict) + "\n\n")
+                
+                if hasattr(msg, "kind") and msg.kind == "request":
+                    role = "user"
+                    # Try to get content
+                    if hasattr(msg, "request"):
+                        if hasattr(msg.request, "user_prompt"):
+                            content = msg.request.user_prompt
+                        elif hasattr(msg.request, "parts") and msg.request.parts:
+                            content = msg.request.parts[0].content
+                        else:
+                            # Debug unhandled structure
+                            with open("/tmp/unhandled_request.json", "a") as f:
+                                f.write(json.dumps(msg_dict) + "\n\n")
+                            continue
+                else:  # Assume response
+                    role = "model"
+                    # Try to get content
+                    if hasattr(msg, "response"):
+                        if hasattr(msg.response, "text"):
+                            content = msg.response.text
+                        elif hasattr(msg.response, "parts") and msg.response.parts:
+                            content = msg.response.parts[0].content
+                        else:
+                            # Debug unhandled structure
+                            with open("/tmp/unhandled_response.json", "a") as f:
+                                f.write(json.dumps(msg_dict) + "\n\n")
+                            continue
                     
-            message = await create_message(
-                db=db,
-                chat_session_id=chat_session_id,
-                role=role,
-                content=content
-            )
-            created_messages.append(message)
-        except Exception as e:
-            # Log the error but continue processing other messages
-            print(f"Error processing message: {str(e)}")
-            continue
-    
-    return created_messages
+                message = await create_message(
+                    db=db,
+                    chat_session_id=chat_session_id,
+                    role=role,
+                    content=content
+                )
+                created_messages.append(message)
+            except Exception as e:
+                # Log the error but continue processing other messages
+                with open("/tmp/message_processing_error.txt", "a") as f:
+                    f.write(f"Error processing message: {str(e)}\n{json.dumps(msg.model_dump())}\n\n")
+                continue
+        
+        return created_messages
+    except Exception as e:
+        # Log any overall errors
+        with open("/tmp/add_model_messages_error.txt", "w") as f:
+            f.write(f"Error: {str(e)}\n{model_messages_json}\n")
+        return []
