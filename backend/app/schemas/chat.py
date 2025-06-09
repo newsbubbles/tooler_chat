@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 class ChatSessionCreate(BaseModel):
-    agent_id: int
+    agent_id: UUID  # Changed from int to UUID
     title: str = Field(..., min_length=1, max_length=100)
 
 
@@ -15,13 +15,18 @@ class ChatSessionUpdate(BaseModel):
 
 class ChatSessionResponse(BaseModel):
     uuid: UUID
+    id: UUID = Field(None)  # Added id field for UUID consistency
     title: str
-    agent_id: int
+    agent_id: UUID  # Changed from int to UUID
     created_at: datetime
     updated_at: datetime
     
     class Config:
         from_attributes = True
+        
+    def model_post_init(self, __context):
+        # Ensure id is set to the uuid value
+        self.id = self.uuid
 
 
 class MessageBase(BaseModel):
@@ -36,9 +41,14 @@ class MessageCreate(BaseModel):
 
 class MessageResponse(MessageBase):
     uuid: UUID
+    id: UUID = Field(None)  # Added id field for UUID consistency
     
     class Config:
         from_attributes = True
+        
+    def model_post_init(self, __context):
+        # Ensure id is set to the uuid value
+        self.id = self.uuid
 
 
 class ChatSessionDetailResponse(ChatSessionResponse):
