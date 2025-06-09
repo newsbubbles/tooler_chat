@@ -113,24 +113,41 @@ async def get_messages_as_model_messages(db: AsyncSession, chat_session_id: int)
     model_messages_json = []
     
     for msg in messages:
-        # Use the correct format with 'kind' as the discriminator field
+        timestamp = msg.timestamp.isoformat()
+        
         if msg.role == "user":
-            # User messages use ModelRequest format
+            # User messages use ModelRequest format with parts
             message_json = {
-                "kind": "request",  # Use 'kind' instead of 'message_type'
+                "kind": "request",
                 "request": {
-                    "user_prompt": msg.content
+                    "user_prompt": msg.content,
+                    # Add parts array which appears to be required
+                    "parts": [
+                        {
+                            "type": "user_prompt",
+                            "content": msg.content,
+                            "timestamp": timestamp
+                        }
+                    ]
                 },
-                "timestamp": msg.timestamp.isoformat()
+                "timestamp": timestamp
             }
         else:
-            # Model messages use ModelResponse format
+            # Model messages use ModelResponse format with parts
             message_json = {
-                "kind": "response",  # Use 'kind' instead of 'message_type'
+                "kind": "response",
                 "response": {
-                    "text": msg.content
+                    "text": msg.content,
+                    # Add parts array which appears to be required
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": msg.content,
+                            "timestamp": timestamp
+                        }
+                    ]
                 },
-                "timestamp": msg.timestamp.isoformat()
+                "timestamp": timestamp
             }
         model_messages_json.append(json.dumps(message_json))
     
@@ -147,20 +164,32 @@ async def add_model_messages(db: AsyncSession, chat_session_id: int, model_messa
     created_messages = []
     
     for msg in model_messages:
-        # Handle the correct format with 'kind' as discriminator
-        if msg.kind == "request":
-            role = "user"
-            content = msg.request.user_prompt
-        else:  # response
-            role = "model"
-            content = msg.response.text
-        
-        message = await create_message(
-            db=db,
-            chat_session_id=chat_session_id,
-            role=role,
-            content=content
-        )
-        created_messages.append(message)
+        try:
+            if msg.kind == "request":
+                role = "user"
+                # Try to get content from parts or directly from user_prompt
+                if hasattr(msg.request, "parts") and msg.request.parts:
+                    content = msg.request.parts[0].content
+                else:
+                    content = msg.request.user_prompt
+            else:  # response
+                role = "model"
+                # Try to get content from parts or directly from text
+                if hasattr(msg.response, "parts") and msg.response.parts:
+                    content = msg.response.parts[0].content
+                else:
+                    content = msg.response.text
+                    
+            message = await create_message(
+                db=db,
+                chat_session_id=chat_session_id,
+                role=role,
+                content=content
+            )
+            created_messages.append(message)
+        except Exception as e:
+            # Log the error but continue processing other messages
+            print(f"Error processing message: {str(e)}")
+            continue
     
     return created_messages
