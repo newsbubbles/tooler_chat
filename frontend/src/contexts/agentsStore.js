@@ -12,7 +12,6 @@ export const useAgentsStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await api.get("/api/agents");
-      console.log(response);
       set({ agents: response.data, isLoading: false });
 
       // If there's no selected agent yet, select the default Tooler agent

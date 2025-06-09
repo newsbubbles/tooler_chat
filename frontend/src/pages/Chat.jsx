@@ -91,7 +91,7 @@ export default function Chat() {
     e.preventDefault();
     if (!message.trim() || !selectedAgent) return;
 
-    console.log(selectedAgent);
+    let sessionToUse = selectedSession;
 
     // Create a new session if needed
     if (!selectedSession) {
@@ -101,6 +101,7 @@ export default function Chat() {
       });
 
       if (newSession) {
+        sessionToUse = newSession;
         navigate(`/chat/${newSession.uuid}`);
       } else {
         return; // Failed to create session
@@ -108,7 +109,7 @@ export default function Chat() {
     }
 
     // Send message
-    await sendMessage(message, selectedSession.uuid);
+    await sendMessage(message, sessionToUse.uuid);
     setMessage("");
   };
 
