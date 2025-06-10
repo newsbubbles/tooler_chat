@@ -31,7 +31,7 @@ def load_agent_prompt(agent_path: str) -> str:
 
 
 def create_tooler_agent(project_tools_path: str = "project_tools", 
-                      agent_prompt_path: str = "backend/app/agents/tooler.md") -> Agent:
+                      agent_prompt_path: str = "app/agents/tooler.md") -> Agent:
     """Create the Tooler agent with proper configuration
     
     Args:

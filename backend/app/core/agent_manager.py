@@ -7,9 +7,9 @@ from typing import Dict, Optional
 from pydantic_ai import Agent
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from backend.app.agents.tooler_agent import create_tooler_agent
-from backend.app.models.base import Agent as AgentModel
-from backend.app.models.base import MCPServer
+from app.agents.tooler_agent import create_tooler_agent
+from app.models.base import Agent as AgentModel
+from app.models.base import MCPServer
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ async def cleanup_agents():
                         except asyncio.CancelledError:
                             pass
         except Exception as e:
-            logger.error(f"Error cleaning up agent {agent_name}: {e}")
+                        logger.error(f"Error cleaning up agent {agent_name}: {e}")
     
     # Clear the cache
     _agent_cache.clear()
