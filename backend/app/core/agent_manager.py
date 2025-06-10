@@ -27,10 +27,14 @@ async def get_or_create_tooler_agent() -> Agent:
     # In development, it might be in a different location than in production
     project_tools_path = "project_tools"
     
-    for candidate_path in ["project_tools", "../project_tools", "../../project_tools"]:
+    # Try various potential paths where project_tools might be located
+    for candidate_path in ["project_tools", "app/project_tools", "../project_tools", "../../project_tools"]:
         if Path(candidate_path).exists():
             project_tools_path = candidate_path
+            logger.info(f"Found project_tools directory at: {candidate_path}")
             break
+    
+    logger.info(f"Using project_tools path: {project_tools_path}")
     
     # Create the agent
     agent = create_tooler_agent(project_tools_path=project_tools_path)
