@@ -1,9 +1,9 @@
-import axios from 'axios';
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '',
+  baseURL: process.env.REACT_APP_API_URL || "https://app.xsus.ai/",
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -14,9 +14,10 @@ api.interceptors.response.use(
     // Handle 401 Unauthorized errors
     if (error.response && error.response.status === 401) {
       // Get auth store and logout user
-      const { logout } = require('../contexts/authStore').useAuthStore.getState();
+      const { logout } =
+        require("../contexts/authStore").useAuthStore.getState();
       logout();
-      window.location.href = '/login';
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }

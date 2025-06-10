@@ -1,38 +1,72 @@
-FROM node:18-alpine as build
+# Use Node.js official image as base
+FROM node:18-alpine
 
+# Set working directory in container
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json* ./
-RUN npm ci
+# Copy package files first (for better layer caching)
+COPY package*.json ./
 
-# Copy application code
+# Install dependencies
+RUN npm install
+
+# Install serve globally
+RUN npm install -g serve
+
+# Copy the rest of the application code
 COPY . .
 
-# Build the application
+# Build the React app
 RUN npm run build
 
-# Production stage
-FROM nginx:alpine
+# Expose port 34140
+EXPOSE 34140
 
-# Copy built assets from build stage
-COPY --from=build /app/build /usr/share/nginx/html
+# Start the application using serve
+CMD ["serve", "-s", "build", "-p", "34140"]
 
-# Copy nginx configuration as a template
-COPY nginx.conf /etc/nginx/conf.d/default.template
 
-# Copy and make entrypoint script executable
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
 
-# Install envsubst for template processing
-RUN apk add --no-cache gettext
+# FROM node:18-alpine as build
 
-# Expose port 80
-EXPOSE 80
+# WORKDIR /app
 
-# Set entrypoint to our script
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# # Install dependencies
+# COPY package.json package-lock.json* ./
+# RUN npm ci
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# # Copy application code
+# COPY . .
+
+# # Build the application
+# RUN npm run build
+
+# RUN npm install -g serve
+
+# RUN npm serve -s build -l 34140
+
+# # Production stage
+# # FROM nginx:alpine
+
+# # Copy built assets from build stage
+# # COPY --from=build /app/build /usr/share/nginx/html
+
+# # # Copy nginx configuration as a template
+# # COPY nginx.conf /etc/nginx/conf.d/default.template
+
+# # # Copy and make entrypoint script executable
+# # COPY docker-entrypoint.sh /docker-entrypoint.sh
+# # RUN chmod +x /docker-entrypoint.sh
+
+# # # Install envsubst for template processing
+# # RUN apk add --no-cache gettext
+
+# # # Expose port 80
+# # EXPOSE 80
+
+# # Set entrypoint to our script
+# # ENTRYPOINT ["/docker-entrypoint.sh"]
+
+# # Start nginx
+# # CMD ["nginx", "-g", "daemon off;"]
+

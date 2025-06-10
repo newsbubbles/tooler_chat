@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
@@ -12,20 +12,20 @@ import {
   IconButton,
   Alert,
   CircularProgress,
-} from '@mui/material';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
-import { useAuthStore } from '../contexts/authStore';
+} from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { useAuthStore } from "../contexts/authStore";
 
 export default function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const { register } = useAuthStore();
@@ -40,22 +40,22 @@ export default function Register() {
 
   const validateForm = () => {
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return false;
     }
 
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setError("Password must be at least 8 characters long");
       return false;
     }
 
-    if (!formData.email.includes('@')) {
-      setError('Please enter a valid email address');
+    if (!formData.email.includes("@")) {
+      setError("Please enter a valid email address");
       return false;
     }
 
     if (formData.username.length < 3) {
-      setError('Username must be at least 3 characters long');
+      setError("Username must be at least 3 characters long");
       return false;
     }
 
@@ -64,7 +64,7 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!validateForm()) {
       return;
@@ -73,14 +73,20 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      const result = await register(formData.username, formData.email, formData.password);
+      const result = await register(
+        formData.username,
+        formData.email,
+        formData.password
+      );
       if (result.success) {
-        navigate('/login', { state: { message: 'Registration successful. Please log in.' } });
+        navigate("/login", {
+          state: { message: "Registration successful. Please log in." },
+        });
       } else {
         setError(result.error);
       }
     } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
+      setError("An unexpected error occurred. Please try again.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -91,21 +97,21 @@ export default function Register() {
     <Container maxWidth="sm">
       <Box
         sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100vh',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
         }}
       >
         <Paper
           elevation={3}
           sx={{
             p: 4,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            width: '100%',
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            width: "100%",
           }}
         >
           <Typography variant="h4" component="h1" gutterBottom>
@@ -116,12 +122,16 @@ export default function Register() {
           </Typography>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 2, width: '100%' }}>
+            <Alert severity="error" sx={{ mb: 2, width: "100%" }}>
               {error}
             </Alert>
           )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%', mt: 1 }}>
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
+            sx={{ width: "100%", mt: 1 }}
+          >
             <TextField
               margin="normal"
               required
@@ -154,7 +164,7 @@ export default function Register() {
               fullWidth
               name="password"
               label="Password"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               id="password"
               autoComplete="new-password"
               value={formData.password}
@@ -180,7 +190,7 @@ export default function Register() {
               fullWidth
               name="confirmPassword"
               label="Confirm Password"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               id="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
@@ -193,11 +203,11 @@ export default function Register() {
               sx={{ mt: 3, mb: 2 }}
               disabled={isLoading}
             >
-              {isLoading ? <CircularProgress size={24} /> : 'Register'}
+              {isLoading ? <CircularProgress size={24} /> : "Register"}
             </Button>
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+            <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
               <Typography variant="body2">
-                Already have an account?{' '}
+                Already have an account?{" "}
                 <Link component={RouterLink} to="/login">
                   Login here
                 </Link>
