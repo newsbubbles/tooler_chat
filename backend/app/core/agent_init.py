@@ -1,8 +1,10 @@
-from app.services.agent_service import get_default_agent, create_agent
+from app.services.agent_service import get_default_agent, create_agent, update_agent
 from app.services.user_service import get_user_by_username
 from app.db.database import get_db_context
 import os
 import logging
+from pathlib import Path
+from datetime import datetime, timezone
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -10,47 +12,19 @@ logger = logging.getLogger(__name__)
 # System username
 SYSTEM_USERNAME = os.getenv("SYSTEM_USERNAME", "system")
 
-# Default Tooler agent system prompt
-TOOLER_AGENT_PROMPT = """
-# Tooler Agent
 
-You are Tooler, a specialized agent focused on building custom API clients based on user requirements.
-
-## Identity
-
-- You specialize in researching APIs, understanding their capabilities, and creating structured tool clients that can be used by other AI systems.
-- Your expertise is in creating Python-based API clients that follow best practices for async operations, error handling, and type safety.
-- Current time: {time_now}
-
-## Instructions
-
-### Research Phase
-1. When presented with a user request for an API client, first focus on understanding their needs and the API's capabilities.
-2. Search for the API documentation and key endpoints that would satisfy the user's requirements.
-3. Collect information about authentication, rate limits, and data formats.
-
-### Design Phase
-1. Create a well-structured API client using modern Python practices.
-2. Use async patterns with httpx for network operations.
-3. Use Pydantic models for request and response validation.
-4. Implement proper error handling and retries where appropriate.
-5. Add clear documentation and type hints.
-
-### Implementation Phase
-1. Produce clean, well-tested code that handles edge cases.
-2. Ensure the interface is intuitive and follows the principle of least surprise.
-3. Create an MCP Server wrapper to make the client usable by other agents.
-
-### Testing Phase
-1. Verify your implementation with sample requests.
-2. Create appropriate test agents.
-
-## Benefits
-
-- I can help you create tools that connect to any API and make those capabilities available to AI assistants.
-- My implementations follow best practices for performance, security, and maintainability.
-- I focus on creating robust, production-ready code that works reliably in real-world scenarios.
-"""
+def load_agent_prompt(agent_path: str) -> str:
+    """Loads agent prompt file and replaces time_now var with current time"""
+    logger.info(f"Loading agent prompt from {agent_path}")
+    time_now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with open(agent_path, "r") as f:
+            agent_prompt = f.read()
+        return agent_prompt.replace('{time_now}', time_now)
+    except Exception as e:
+        logger.error(f"Failed to load agent prompt: {str(e)}")
+        # Return a minimal prompt if the file can't be loaded
+        return "You are a helpful assistant. Today is {time_now}.".replace('{time_now}', time_now)
 
 
 async def init_tooler_agent():
@@ -58,6 +32,20 @@ async def init_tooler_agent():
     async with get_db_context() as db:
         # First check if default agent already exists
         default_agent = await get_default_agent(db)
+        
+        # Try to load the tooler agent prompt
+        root_path = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        agent_prompt_path = root_path / "agents" / "tooler.md"
+        
+        if agent_prompt_path.exists():
+            # Load the improved tooler agent prompt
+            system_prompt = load_agent_prompt(str(agent_prompt_path))
+            logger.info("Loaded tooler agent prompt from file")
+        else:
+            # Fallback to basic prompt
+            system_prompt = "You are Tooler, an agent specialized in building custom API clients. Current time: {time_now}"
+            system_prompt = system_prompt.replace('{time_now}', datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
+            logger.warning(f"Could not find tooler agent prompt at {agent_prompt_path}, using fallback")
         
         if not default_agent:
             # Get system user
@@ -72,12 +60,24 @@ async def init_tooler_agent():
                 db=db,
                 user_id=system_user.id,
                 name="Tooler",
-                description="The default Tooler agent for building custom API clients",
-                system_prompt=TOOLER_AGENT_PROMPT,
+                description="Builds custom API clients based on user requirements",
+                system_prompt=system_prompt,
                 is_default=True
             )
             logger.info("Default Tooler agent created successfully")
             return True
         else:
-            logger.info("Default Tooler agent already exists")
+            # If agent exists but has a different name than Tooler, don't update
+            if default_agent.name.lower() != "tooler":
+                logger.info(f"Default agent exists with name: {default_agent.name}, not updating")
+                return True
+                
+            # Update the system prompt for the existing Tooler agent
+            logger.info("Updating existing Tooler agent prompt")
+            await update_agent(
+                db=db,
+                agent_id=default_agent.id,
+                system_prompt=system_prompt
+            )
+            logger.info("Default Tooler agent updated successfully")
             return True
