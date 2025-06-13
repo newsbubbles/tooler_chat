@@ -110,46 +110,45 @@ async def get_chat_session_messages(db: AsyncSession, chat_session_id: int) -> L
 
 async def get_messages_as_model_messages(db: AsyncSession, chat_session_id: int) -> List[ModelMessage]:
     """Get chat session messages in a format suitable for the agent"""
-    # If the chat session is empty, return an empty list
     messages = await get_chat_session_messages(db, chat_session_id)
     if not messages:
         return []
     
-    # Instead of building a JSON string and validating it all at once,
-    # let's try to directly create a list of Python dictionaries and validate it
-    result = []
-    
     try:
-        # Sample format for debugging - a simple test message that works with the agent
-        # This is what would typically come from a user's first message to an empty chat
-        sample_json = """[
-            {
-                "kind": "request",
-                "request": {
-                    "user_prompt": "Hello",
+        formatted_messages = []
+        
+        for message in messages:
+            if message.role == "user":
+                # User messages need the correct part format with part_kind discriminator
+                formatted_msg = {
+                    "kind": "request",
                     "parts": [
                         {
-                            "type": "user_prompt",
-                            "content": "Hello",
-                            "timestamp": "2023-06-09T14:00:00.000000"
+                            "part_kind": "user-prompt",  # Must be one of: 'system-prompt', 'user-prompt', 'tool-return', 'retry-prompt'
+                            "content": message.content  # Changed from 'text' to 'content'
                         }
                     ]
-                },
-                "timestamp": "2023-06-09T14:00:00.000000"
-            }
-        ]"""
+                }
+            elif message.role == "model" or message.role == "assistant":
+                # Model responses use a simpler format
+                formatted_msg = {
+                    "kind": "response",
+                    "content": message.content
+                }
+            else:
+                # Skip unknown message types
+                continue
+                
+            formatted_messages.append(formatted_msg)
         
-        # Use the sample format as a fallback to get a working implementation
-        with open("/tmp/debug_messages.txt", "w") as f:
-            f.write("Trying to use sample format as fallback\n")
+        # Validate and return
+        return ModelMessagesTypeAdapter.validate_python(formatted_messages)
         
-        return ModelMessagesTypeAdapter.validate_json(sample_json)
     except Exception as e:
-        # If we encounter an error, log it and return an empty list
         print(f"Error validating model messages: {str(e)}", file=sys.stderr)
-        with open("/tmp/model_message_error.txt", "w") as f:
-            f.write(f"Error: {str(e)}\n")
+        print(f"Sample formatted message: {formatted_messages[0] if formatted_messages else 'None'}", file=sys.stderr)
         return []
+
 
 
 async def add_model_messages(db: AsyncSession, chat_session_id: int, model_messages_json: str) -> List[Message]:
