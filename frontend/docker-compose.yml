@@ -1,0 +1,9 @@
+version: "3.8"
+
+services:
+  react-app:
+    build: .
+    ports:
+      - "34140:34140"
+    container_name: tooler-frontend
+    restart: unless-stopped
