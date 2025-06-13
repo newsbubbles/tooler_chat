@@ -9,6 +9,8 @@ services:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/toolerchat
       - SECRET_KEY=${SECRET_KEY:-very-secret-key-for-development-only}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - SERPER_API_KEY=${SERPER_API_KEY}
       - PORT=${BACKEND_PORT:-34130}
     volumes:
       - ./backend/app:/app/app
