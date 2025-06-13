@@ -5,9 +5,11 @@ from typing import List, Dict, Any
 import json
 from datetime import datetime, timezone
 from uuid import UUID
+import logging
 
 from app.db.database import get_db
 from app.core.auth import get_current_active_user
+from app.core.agent_manager import get_agent_instance  # Use our new agent_manager
 from app.models.base import User
 from app.schemas.chat import (
     ChatSessionCreate, ChatSessionUpdate, ChatSessionResponse,
@@ -30,73 +32,15 @@ from pydantic_ai.agent import AgentRunResult
 import os
 import asyncio
 import tempfile
-from uuid import UUID
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
 # Configure API keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-
-async def get_agent_instance(agent_uuid: str, db: AsyncSession):
-    """Get a configured Agent instance with associated MCP servers"""
-    # Get the agent from the database
-    agent_db = await get_agent_by_uuid(db, agent_uuid)
-    if not agent_db:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    
-    # Get associated MCP servers
-    mcp_servers_db = await get_agent_mcp_servers(db, agent_db.id)
-    mcp_servers = []
-    
-    # Prepare environment variables for MCP servers
-    # In a production system, these would be securely stored and retrieved
-    env = {
-        "OPENAI_API_KEY": OPENAI_API_KEY,
-        "OPENROUTER_API_KEY": OPENROUTER_API_KEY,
-        # Add other necessary API keys from environment or secure storage
-    }
-    
-    # Configure MCP servers
-    for mcp_server_db in mcp_servers_db:
-        # Create a temporary file with the MCP server code
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as temp_file:
-            temp_file.write(mcp_server_db.code)
-            mcp_server_path = temp_file.name
-        
-        # Create MCPServerStdio instance with environment variables
-        mcp_server = MCPServerStdio('python', [mcp_server_path], env=env)
-        mcp_servers.append(mcp_server)
-    
-    # Configure the model - using OpenRouter for access to various models
-    default_model = "anthropic/claude-3.7-sonnet"  # Default model, could be configurable per agent
-    
-    # Use OpenAI provider with OpenRouter base URL if OPENROUTER_API_KEY is available
-    # Otherwise fall back to regular OpenAI
-    if OPENROUTER_API_KEY:
-        provider = OpenAIProvider(
-            base_url='https://openrouter.ai/api/v1',
-            api_key=OPENROUTER_API_KEY
-        )
-    else:
-        provider = OpenAIProvider(api_key=OPENAI_API_KEY)
-    
-    # Create the model with appropriate configuration
-    model = OpenAIModel(
-        default_model,
-        provider=provider
-    )
-    
-    # Create the agent with the system prompt from the database
-    agent_instance = Agent(
-        model,
-        mcp_servers=mcp_servers,
-        system_prompt=agent_db.system_prompt
-    )
-    
-    return agent_instance
-
 
 @router.post("/chat/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_chat_session(
@@ -309,11 +253,15 @@ async def create_chat_message(
     )
     
     # Get agent and run it to generate a response
-    agent = await get_agent_by_id(db, chat_session.agent_id)
-    if not agent:
+    agent_model = await get_agent_by_id(db, chat_session.agent_id)
+    if not agent_model:
         raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Get agent instance from our agent_manager
+    agent_instance = await get_agent_instance(agent_model, db)
+    if not agent_instance:
+        raise HTTPException(status_code=500, detail="Failed to initialize agent")
         
-    agent_instance = await get_agent_instance(str(agent.uuid), db)
     message_history = await get_messages_as_model_messages(db, chat_session.id)
     
     async with agent_instance.run_mcp_servers():
@@ -384,8 +332,8 @@ async def stream_chat_message(
         }).encode("utf-8") + b"\n"
         
         # Get agent and message history
-        agent = await get_agent_by_id(db, chat_session.agent_id)
-        if not agent:
+        agent_model = await get_agent_by_id(db, chat_session.agent_id)
+        if not agent_model:
             error_msg = "Agent not found"
             yield json.dumps({
                 "role": "model",
@@ -395,8 +343,20 @@ async def stream_chat_message(
                 "id": "error"  # Special ID for errors
             }).encode("utf-8") + b"\n"
             return
+        
+        # Get agent instance from our agent_manager    
+        agent_instance = await get_agent_instance(agent_model, db)
+        if not agent_instance:
+            error_msg = "Failed to initialize agent"
+            yield json.dumps({
+                "role": "model",
+                "content": error_msg,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "error": True,
+                "id": "error"  # Special ID for errors
+            }).encode("utf-8") + b"\n"
+            return
             
-        agent_instance = await get_agent_instance(str(agent.uuid), db)
         message_history = await get_messages_as_model_messages(db, chat_session.id)
         model_message = None
         
@@ -440,6 +400,7 @@ async def stream_chat_message(
         except Exception as e:
             # Send error message if something goes wrong
             error_message = f"Error processing request: {str(e)}"
+            logger.error(f"Streaming error: {error_message}")
             
             # Create an error message in the database
             error_msg = await create_message(
