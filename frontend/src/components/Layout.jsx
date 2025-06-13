@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
 import {
   Box,
   Drawer,
@@ -19,7 +19,7 @@ import {
   useTheme,
   useMediaQuery,
   Button,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
@@ -28,20 +28,21 @@ import {
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   AccountCircle as AccountCircleIcon,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
-import { useAuthStore } from '../contexts/authStore';
-import { useAgentsStore } from '../contexts/agentsStore';
-import { useChatStore } from '../contexts/chatStore';
-import RightPanel from './RightPanel';
-import CreateAgentDialog from './dialogs/CreateAgentDialog';
+import { useAuthStore } from "../contexts/authStore";
+import { useAgentsStore } from "../contexts/agentsStore";
+import { useChatStore } from "../contexts/chatStore";
+import RightPanel from "./RightPanel";
+import CreateAgentDialog from "./dialogs/CreateAgentDialog";
 
 const drawerWidth = 280;
 const rightPanelWidth = 280;
 
 export default function Layout() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
   const [rightPanelOpen, setRightPanelOpen] = useState(!isMobile);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -49,7 +50,8 @@ export default function Layout() {
 
   const { user, logout } = useAuthStore();
   const { agents, selectedAgent, selectAgent, loadAgents } = useAgentsStore();
-  const { sessions, selectedSession, selectSession, loadSessions } = useChatStore();
+  const { sessions, selectedSession, selectSession, loadSessions } =
+    useChatStore();
 
   // Load agents and sessions on component mount
   React.useEffect(() => {
@@ -87,6 +89,15 @@ export default function Layout() {
 
   const handleSessionSelect = (session) => {
     selectSession(session);
+    navigate(`/chat/${session.uuid}`);
+    if (isMobile) {
+      setDrawerOpen(false);
+    }
+  };
+
+  const handleNewChat = () => {
+    selectSession(null);
+    navigate("/chat/new");
     if (isMobile) {
       setDrawerOpen(false);
     }
@@ -97,13 +108,13 @@ export default function Layout() {
   };
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh' }}>
+    <Box sx={{ display: "flex", height: "100vh" }}>
       {/* Top AppBar */}
       <AppBar
         position="fixed"
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          transition: theme.transitions.create(['width', 'margin'], {
+          transition: theme.transitions.create(["width", "margin"], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
           }),
@@ -134,20 +145,20 @@ export default function Layout() {
             color="inherit"
           >
             <Avatar sx={{ width: 32, height: 32 }}>
-              {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
+              {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
             </Avatar>
           </IconButton>
           <Menu
             id="menu-appbar"
             anchorEl={anchorEl}
             anchorOrigin={{
-              vertical: 'bottom',
-              horizontal: 'right',
+              vertical: "bottom",
+              horizontal: "right",
             }}
             keepMounted
             transformOrigin={{
-              vertical: 'top',
-              horizontal: 'right',
+              vertical: "top",
+              horizontal: "right",
             }}
             open={Boolean(anchorEl)}
             onClose={handleMenuClose}
@@ -173,19 +184,33 @@ export default function Layout() {
         sx={{
           width: drawerWidth,
           flexShrink: 0,
-          '& .MuiDrawer-paper': {
+          "& .MuiDrawer-paper": {
             width: drawerWidth,
-            boxSizing: 'border-box',
+            boxSizing: "border-box",
           },
         }}
-        variant={isMobile ? 'temporary' : 'persistent'}
+        variant={isMobile ? "temporary" : "persistent"}
         anchor="left"
         open={drawerOpen}
         onClose={isMobile ? handleDrawerToggle : undefined}
       >
         <Toolbar />
-        <Box sx={{ overflow: 'auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box
+          sx={{
+            overflow: "auto",
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+          }}
+        >
+          <Box
+            sx={{
+              p: 2,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <Typography variant="h6">Agents</Typography>
             <Button
               startIcon={<AddIcon />}
@@ -204,9 +229,14 @@ export default function Layout() {
                   onClick={() => handleAgentSelect(agent)}
                 >
                   <ListItemIcon>
-                    <SmartToyIcon color={agent.is_default ? 'primary' : 'inherit'} />
+                    <SmartToyIcon
+                      color={agent.is_default ? "primary" : "inherit"}
+                    />
                   </ListItemIcon>
-                  <ListItemText primary={agent.name} secondary={agent.is_default ? 'Default' : ''} />
+                  <ListItemText
+                    primary={agent.name}
+                    secondary={agent.is_default ? "Default" : ""}
+                  />
                 </ListItemButton>
               </ListItem>
             ))}
@@ -215,18 +245,25 @@ export default function Layout() {
           {selectedAgent && (
             <>
               <Divider />
-              <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box
+                sx={{
+                  p: 2,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <Typography variant="h6">Sessions</Typography>
                 <Button
                   startIcon={<AddIcon />}
                   size="small"
-                  onClick={() => selectSession(null)}
+                  onClick={handleNewChat}
                   variant="outlined"
                 >
                   New Chat
                 </Button>
               </Box>
-              <List sx={{ flex: 1, overflow: 'auto' }}>
+              <List sx={{ flex: 1, overflow: "auto" }}>
                 {sessions.map((session) => (
                   <ListItem key={session.uuid} disablePadding>
                     <ListItemButton
@@ -235,7 +272,9 @@ export default function Layout() {
                     >
                       <ListItemText
                         primary={session.title}
-                        secondary={new Date(session.updated_at).toLocaleString()}
+                        secondary={new Date(
+                          session.updated_at
+                        ).toLocaleString()}
                       />
                     </ListItemButton>
                   </ListItem>
@@ -252,20 +291,26 @@ export default function Layout() {
         sx={{
           flexGrow: 1,
           p: 0,
-          width: `calc(100% - ${drawerOpen ? drawerWidth : 0}px - ${rightPanelOpen ? rightPanelWidth : 0}px)`,
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
+          width: `calc(100% - ${drawerOpen ? drawerWidth : 0}px - ${
+            rightPanelOpen ? rightPanelWidth : 0
+          }px)`,
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <Toolbar />
-        <Box sx={{ flex: 1, overflow: 'auto' }}>
+        <Box sx={{ flex: 1, overflow: "auto" }}>
           <Outlet />
         </Box>
       </Box>
 
       {/* Right Panel - MCPs & Project Structure */}
-      <RightPanel open={rightPanelOpen} width={rightPanelWidth} onClose={handleRightPanelToggle} />
+      <RightPanel
+        open={rightPanelOpen}
+        width={rightPanelWidth}
+        onClose={handleRightPanelToggle}
+      />
 
       {/* Dialogs */}
       <CreateAgentDialog

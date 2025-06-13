@@ -30,9 +30,48 @@ export const useChatStore = create((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await api.get(`/api/chat/sessions/${sessionUuid}`);
+
+      // Get current temporary messages
+      const currentState = get();
+      const temporaryMessages = currentState.messages.filter(
+        (msg) => msg.isTemporary
+      );
+
+      // If we have temporary messages, merge them with server messages
+      let finalMessages = response.data.messages;
+      if (temporaryMessages.length > 0) {
+        // Keep temporary messages and only add new server messages
+        const serverMessageIds = new Set(
+          response.data.messages.map((msg) => msg.uuid)
+        );
+        const tempMessagesToKeep = temporaryMessages.filter((msg) => {
+          // Keep temporary messages that don't have corresponding server messages
+          return !serverMessageIds.has(
+            msg.uuid.replace("temp-user-", "").replace("temp-model-", "")
+          );
+        });
+
+        // If we have ongoing streaming (temporary model message with content), keep it
+        const streamingMessage = temporaryMessages.find(
+          (msg) => msg.role === "model" && msg.content && msg.isTemporary
+        );
+
+        if (streamingMessage) {
+          // Don't override with server data if we're streaming
+          console.log("🎭 Preserving streaming message during session load");
+          set({
+            selectedSession: response.data,
+            isLoading: false,
+          });
+          return response.data;
+        } else {
+          finalMessages = [...response.data.messages, ...tempMessagesToKeep];
+        }
+      }
+
       set({
         selectedSession: response.data,
-        messages: response.data.messages,
+        messages: finalMessages,
         isLoading: false,
       });
       return response.data;
@@ -141,28 +180,27 @@ export const useChatStore = create((set, get) => ({
     let reader = null;
 
     try {
-      // Add user message to UI immediately
+      // Create unique identifiers
+      const timestamp = Date.now();
       const userMessage = {
-        uuid: `temp-${Date.now()}`,
+        uuid: `temp-user-${timestamp}`,
         role: "user",
         content,
         timestamp: new Date().toISOString(),
+        isTemporary: true, // Mark as temporary
       };
 
-      set((state) => ({
-        messages: [...state.messages, userMessage],
-      }));
-
-      // Initialize model message with empty content
       const modelMessage = {
-        uuid: `temp-response-${Date.now()}`,
+        uuid: `temp-model-${timestamp}`,
         role: "model",
         content: "",
         timestamp: new Date().toISOString(),
+        isTemporary: true, // Mark as temporary
       };
 
+      // Add both messages at once
       set((state) => ({
-        messages: [...state.messages, modelMessage],
+        messages: [...state.messages, userMessage, modelMessage],
       }));
 
       const authStorage = localStorage.getItem("auth-storage");
@@ -191,72 +229,117 @@ export const useChatStore = create((set, get) => ({
 
       reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let partialMessage = "";
-      let accumulatedContent = ""; // Track accumulated content
+      let buffer = "";
+      let longestContent = ""; // Track the longest/most complete content
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        // Decode and concatenate the chunks
+        // Decode the chunk
         const chunk = decoder.decode(value, { stream: true });
-        partialMessage += chunk;
+        buffer += chunk;
 
-        // Process complete messages (delimited by newlines)
-        const lines = partialMessage.split("\n");
-        partialMessage = lines.pop() || ""; // Keep the last incomplete line
+        // Process complete lines
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep the incomplete line in buffer
 
         for (const line of lines) {
           if (line.trim()) {
             try {
               const messageData = JSON.parse(line);
 
-              // Accumulate content instead of replacing
               if (messageData.content) {
-                accumulatedContent += messageData.content;
+                let currentContent = messageData.content;
 
-                // Update the model's message content
-                set((state) => ({
-                  messages: state.messages.map((msg) => {
-                    if (
-                      msg.role === "model" &&
-                      msg.uuid === modelMessage.uuid
-                    ) {
-                      return { ...msg, content: accumulatedContent };
-                    }
-                    return msg;
-                  }),
-                }));
+                // Skip if this is just the user's input echoed back
+                if (currentContent.trim() === content.trim()) {
+                  continue;
+                }
+
+                // Remove user input from the beginning if it's there
+                if (currentContent.startsWith(content)) {
+                  currentContent = currentContent
+                    .substring(content.length)
+                    .trim();
+                }
+
+                // Only update if this content is longer than what we have
+                // This ensures we always show the most complete version
+                if (currentContent.length > longestContent.length) {
+                  longestContent = currentContent;
+
+                  // Update the UI with the longest content so far
+                  set((state) => ({
+                    messages: state.messages.map((msg) => {
+                      if (
+                        msg.role === "model" &&
+                        msg.uuid === modelMessage.uuid &&
+                        msg.isTemporary
+                      ) {
+                        return { ...msg, content: longestContent };
+                      }
+                      return msg;
+                    }),
+                  }));
+                }
               }
             } catch (e) {
-              console.error("Error parsing message:", e, line);
+              console.error("Error parsing streaming chunk:", e, "Line:", line);
             }
           }
         }
       }
 
-      // Process any remaining partial message
-      if (partialMessage.trim()) {
+      // Process any remaining content in buffer
+      if (buffer.trim()) {
         try {
-          const messageData = JSON.parse(partialMessage);
+          const messageData = JSON.parse(buffer);
           if (messageData.content) {
-            accumulatedContent += messageData.content;
+            let currentContent = messageData.content;
 
-            set((state) => ({
-              messages: state.messages.map((msg) => {
-                if (msg.role === "model" && msg.uuid === modelMessage.uuid) {
-                  return { ...msg, content: accumulatedContent };
-                }
-                return msg;
-              }),
-            }));
+            if (currentContent.trim() !== content.trim()) {
+              if (currentContent.startsWith(content)) {
+                currentContent = currentContent
+                  .substring(content.length)
+                  .trim();
+              }
+
+              if (currentContent.length > longestContent.length) {
+                longestContent = currentContent;
+
+                set((state) => ({
+                  messages: state.messages.map((msg) => {
+                    if (
+                      msg.role === "model" &&
+                      msg.uuid === modelMessage.uuid &&
+                      msg.isTemporary
+                    ) {
+                      return { ...msg, content: longestContent };
+                    }
+                    return msg;
+                  }),
+                }));
+              }
+            }
           }
         } catch (e) {
-          console.error("Error parsing final message:", e);
+          console.error("Error parsing final chunk:", e);
         }
       }
 
-      // Update the session
+      // Streaming completed successfully
+      // We'll keep the temporary messages and only replace them when:
+      // 1. User navigates away and comes back
+      // 2. User manually refreshes
+      // 3. A new message is sent
+      // This prevents the disappearing message issue
+      console.log("🎭 Streaming completed, keeping temporary messages in UI");
+
+      // Note: We don't automatically reload the session here to avoid interrupting streaming
+      // The session will be reloaded when the user navigates or refreshes
+
+      // Update the session timestamp
       const updatedSession = {
         ...get().selectedSession,
         updated_at: new Date().toISOString(),

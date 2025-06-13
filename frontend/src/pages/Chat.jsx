@@ -37,6 +37,7 @@ export default function Chat() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false); // Add this flag
 
   const {
     selectedSession,
@@ -51,21 +52,48 @@ export default function Chat() {
 
   const { selectedAgent } = useAgentsStore();
 
-  // Load session when sessionId changes
+  // Load session when sessionId changes, but not if we're currently sending a message
   useEffect(() => {
+    if (isSendingMessage) {
+      console.log("🎭 Skipping session load - currently sending message");
+      return; // Don't reload session while sending message
+    }
+
+    if (sessionId === "new") {
+      // Always handle "new" chat, regardless of temporary messages
+      console.log("🎭 Setting up new chat");
+      if (selectedAgent) {
+        useChatStore.setState({
+          selectedSession: null,
+          messages: [],
+        });
+      }
+      return;
+    }
+
+    // Check if we have any temporary messages (streaming or recently sent)
+    // Only for existing sessions, not for new chats
+    const hasTemporaryMessages = messages.some((msg) => msg.isTemporary);
+
+    if (hasTemporaryMessages) {
+      console.log("🎭 Skipping session load - have temporary messages");
+      return;
+    }
+
     if (sessionId && sessionId !== "new") {
+      console.log("🎭 Loading session:", sessionId);
       setIsLoadingMessages(true);
       loadSession(sessionId).finally(() => {
         setIsLoadingMessages(false);
       });
-    } else if (sessionId === "new" && selectedAgent) {
-      // Clear any current session data for a new session
-      useChatStore.setState({
-        selectedSession: null,
-        messages: [],
-      });
     }
-  }, [sessionId, loadSession, selectedAgent]);
+  }, [
+    sessionId,
+    loadSession,
+    selectedAgent,
+    isSendingMessage,
+    messages.length,
+  ]); // Add messages.length to dependencies
 
   // Update title when session changes
   useEffect(() => {
@@ -83,6 +111,14 @@ export default function Chat() {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    console.log("🎭 Chat component - messages updated:", messages);
+    console.log("🎭 Messages length:", messages.length);
+    if (messages.length > 0) {
+      console.log("🎭 Last message:", messages[messages.length - 1]);
+    }
+  }, [messages]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -91,26 +127,35 @@ export default function Chat() {
     e.preventDefault();
     if (!message.trim() || !selectedAgent) return;
 
+    setIsSendingMessage(true); // Set flag to prevent session reload
+
     let sessionToUse = selectedSession;
 
-    // Create a new session if needed
-    if (!selectedSession) {
-      const newSession = await createSession({
-        agent_id: selectedAgent.id,
-        title: message.length > 30 ? `${message.substring(0, 30)}...` : message,
-      });
+    try {
+      // Create a new session if needed
+      if (!selectedSession) {
+        const newSession = await createSession({
+          agent_id: selectedAgent.id,
+          title:
+            message.length > 30 ? `${message.substring(0, 30)}...` : message,
+        });
 
-      if (newSession) {
-        sessionToUse = newSession;
-        navigate(`/chat/${newSession.uuid}`);
-      } else {
-        return; // Failed to create session
+        if (newSession) {
+          sessionToUse = newSession;
+          // Navigate but don't trigger useEffect yet
+          navigate(`/chat/${newSession.uuid}`, { replace: true });
+        } else {
+          setIsSendingMessage(false);
+          return; // Failed to create session
+        }
       }
-    }
 
-    // Send message
-    await sendMessage(message, sessionToUse.uuid);
-    setMessage("");
+      // Send message
+      await sendMessage(message, sessionToUse.uuid);
+      setMessage("");
+    } finally {
+      setIsSendingMessage(false); // Always clear the flag
+    }
   };
 
   const handleTitleUpdate = async () => {
@@ -312,7 +357,12 @@ export default function Chat() {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (message.trim() && selectedAgent && !isLoading) {
+              if (
+                message.trim() &&
+                selectedAgent &&
+                !isLoading &&
+                !isSendingMessage
+              ) {
                 handleSendMessage(e);
               }
             }
@@ -321,10 +371,10 @@ export default function Chat() {
           variant="outlined"
           multiline
           maxRows={4}
-          disabled={isLoading}
+          disabled={isLoading || isSendingMessage}
         />
         <Box sx={{ ml: 1, display: "flex", alignItems: "center" }}>
-          {isLoading ? (
+          {isLoading || isSendingMessage ? (
             <CircularProgress size={24} sx={{ mx: 1 }} />
           ) : (
             <IconButton
