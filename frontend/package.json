@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@capacitor/android": "^7.3.0",
+    "@capacitor/cli": "^7.3.0",
+    "@capacitor/core": "^7.3.0",
+    "@capacitor/ios": "^7.3.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.14.16",
@@ -26,8 +30,11 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:android": "npx cap run android",
+    "cap:ios": "npx cap run ios",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios"
   },
   "eslintConfig": {
     "extends": [

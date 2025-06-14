@@ -3,18 +3,191 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+
+    <!-- Enhanced viewport for mobile optimization -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+
+    <!-- PWA Theme colors -->
+    <meta name="theme-color" content="#2196f3" />
+    <meta name="msapplication-TileColor" content="#2196f3" />
+
+    <!-- Enhanced description -->
     <meta
       name="description"
-      content="Tooler Chat - Web app created with Create React App"
+      content="Tooler Chat - A modern chat application built with React"
     />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+
+    <!-- PWA Apple-specific meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Tooler Chat" />
+
+    <!-- Icons for different platforms -->
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link
+      rel="apple-touch-icon"
+      sizes="152x152"
+      href="%PUBLIC_URL%/favicon.ico"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="%PUBLIC_URL%/favicon.ico"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="167x167"
+      href="%PUBLIC_URL%/favicon.ico"
+    />
+
+    <!-- Manifest for PWA -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Prevent zoom on input focus (mobile) -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Security headers -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content:; connect-src 'self' https://app.xsus.ai;"
+    />
+
     <title>Tooler Chat</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+
+    <script>
+      // Enhanced service worker registration with better error handling
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then((registration) => {
+              console.log("SW registered successfully: ", registration);
+
+              registration.addEventListener("updatefound", () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener("statechange", () => {
+                  if (
+                    newWorker.state === "installed" &&
+                    navigator.serviceWorker.controller
+                  ) {
+                    if (confirm("New version available! Refresh to update?")) {
+                      window.location.reload();
+                    }
+                  }
+                });
+              });
+            })
+            .catch((registrationError) => {
+              console.error("SW registration failed: ", registrationError);
+            });
+        });
+      }
+
+      // Enhanced install prompt handling with debugging
+      let deferredPrompt;
+      let installButton;
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        console.log("beforeinstallprompt event fired");
+        e.preventDefault();
+        deferredPrompt = e;
+
+        // Show install button or trigger install
+        // showInstallButton();
+      });
+
+      function showInstallButton() {
+        // Create and show install button
+        if (!installButton) {
+          installButton = document.createElement("button");
+          installButton.textContent = "Install App";
+          installButton.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        padding: 10px 20px;
+        background: #2196f3;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      `;
+          installButton.addEventListener("click", installApp);
+          document.body.appendChild(installButton);
+        }
+        installButton.style.display = "block";
+      }
+
+      async function installApp() {
+        if (!deferredPrompt) {
+          console.log("No deferred prompt available");
+          return;
+        }
+
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response to the install prompt: ${outcome}`);
+
+        if (outcome === "accepted") {
+          console.log("User accepted the install prompt");
+        } else {
+          console.log("User dismissed the install prompt");
+        }
+
+        deferredPrompt = null;
+        if (installButton) {
+          installButton.style.display = "none";
+        }
+      }
+
+      // Check if app is already installed
+      window.addEventListener("appinstalled", () => {
+        console.log("PWA was installed");
+        if (installButton) {
+          installButton.style.display = "none";
+        }
+      });
+
+      // Debug PWA status
+      window.addEventListener("DOMContentLoaded", () => {
+        console.log("=== PWA Debug Info ===");
+        console.log(
+          "Display mode:",
+          window.matchMedia("(display-mode: standalone)").matches
+            ? "standalone"
+            : "browser"
+        );
+        console.log("Service Worker supported:", "serviceWorker" in navigator);
+        console.log(
+          "Manifest link exists:",
+          !!document.querySelector('link[rel="manifest"]')
+        );
+
+        // Check if running as PWA
+        if (window.matchMedia("(display-mode: standalone)").matches) {
+          console.log("App is running as PWA");
+        }
+
+        // Check manifest
+        if ("getManifest" in navigator) {
+          navigator
+            .getManifest()
+            .then((manifest) => {
+              console.log("Manifest loaded:", manifest);
+            })
+            .catch((err) => {
+              console.error("Manifest error:", err);
+            });
+        }
+      });
+    </script>
   </body>
 </html>
