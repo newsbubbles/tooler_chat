@@ -12,7 +12,7 @@ import { useAuthStore } from "./contexts/authStore";
 
 const theme = createTheme({
   palette: {
-    mode: "light",
+    mode: "dark",
     primary: {
       main: "#2196f3",
     },
@@ -20,7 +20,7 @@ const theme = createTheme({
       main: "#f50057",
     },
     background: {
-      default: "#f5f5f5",
+      default: "#121212",
     },
   },
   typography: {

@@ -277,7 +277,6 @@ export default function Chat() {
           flex: 1,
           overflow: "auto",
           p: 2,
-          backgroundColor: "#f9f9f9",
         }}
       >
         {isLoadingMessages ? (
@@ -306,7 +305,6 @@ export default function Chat() {
                 sx={{
                   p: 2,
                   maxWidth: "80%",
-                  backgroundColor: msg.role === "user" ? "#e3f2fd" : "white",
                   borderRadius: 2,
                 }}
               >
