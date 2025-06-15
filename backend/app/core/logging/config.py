@@ -205,6 +205,22 @@ def setup_logging(
             api_logger.propagate = True  # Allow messages to propagate to root logger
             api_logger.addHandler(api_handler)
             
+            # Chat API specific log - NEW!
+            chat_log_path = logs_dir / "chat.log"
+            chat_handler = RotatingFileHandler(
+                filename=chat_log_path,
+                maxBytes=10 * 1024 * 1024,  # 10MB
+                backupCount=5
+            )
+            # Set the level based on environment, but ensure it's at least INFO to capture important events
+            chat_log_level = min(numeric_level, logging.INFO)
+            chat_handler.setLevel(chat_log_level)
+            chat_handler.setFormatter(formatter)
+            chat_logger = logging.getLogger("app.api.chat")
+            chat_logger.propagate = True  # Allow messages to propagate to root logger
+            chat_logger.addHandler(chat_handler)
+            print(f"Chat log file created at {chat_log_path}")
+            
             # Request/Response log for ultra-verbose mode
             if max_debug:
                 request_log_path = logs_dir / "requests.log"
@@ -239,6 +255,9 @@ def setup_logging(
                 sql_handler.setFormatter(formatter)
                 sql_logger = logging.getLogger("sqlalchemy.engine")
                 sql_logger.addHandler(sql_handler)
+                
+                # Set chat logger to DEBUG in max debug mode
+                chat_logger.setLevel(logging.DEBUG)
                 
                 print(f"MAX DEBUG MODE ENABLED - All requests, responses, and SQL queries will be logged")
         except Exception as e:

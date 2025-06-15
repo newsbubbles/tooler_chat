@@ -24,6 +24,7 @@ Logs are stored in the `logs/` directory with several different files:
 - `daily.log` - Daily rotating log
 - `tool_calls.log` - Log of tool calls only
 - `api_endpoints.log` - Log of API endpoint calls only
+- `chat.log` - **NEW!** Dedicated log for chat operations
 
 When MAX_DEBUG mode is enabled, additional log files are created:
 
@@ -143,6 +144,63 @@ with logger.catch_exceptions("important_operation"):
     process_data()
 ```
 
+## Chat-Specific Logging
+
+### Using the Dedicated Chat Logger
+
+For chat operations, use the dedicated chat logger module:
+
+```python
+from app.api.chat_logger import (
+    log_chat_session_operation,
+    log_message_operation,
+    log_agent_operation,
+    log_chat_error,
+    timed_operation
+)
+
+# Log a chat session operation
+log_chat_session_operation(
+    "created", 
+    session_uuid=str(chat_session.uuid), 
+    user_id=current_user.id, 
+    title=session_data.title
+)
+
+# Log a message operation
+log_message_operation(
+    "sent",
+    session_uuid=str(session_uuid),
+    message_uuid=str(message.uuid),
+    role="user",
+    content_length=len(message.content)
+)
+
+# Time an agent operation
+async with timed_operation(
+    "process_message",
+    session_uuid=str(session_uuid),
+    agent_name=agent.name
+):
+    # Complex agent processing here
+    result = await agent.process(message)
+```
+
+### Debugging Chat Issues
+
+When debugging chat-related issues, focus on these log files:
+
+```bash
+# View dedicated chat logs
+docker exec -it tooler_chat_backend_1 tail -f /app/logs/chat.log
+
+# View chat errors
+docker exec -it tooler_chat_backend_1 grep -r "Chat error" /app/logs/error.log
+
+# Track a specific chat session
+docker exec -it tooler_chat_backend_1 grep -r "YOUR_SESSION_UUID" /app/logs/chat.log
+```
+
 ## Middleware for Request Tracking
 
 All HTTP requests are automatically logged by the `LoggingMiddleware` with:
@@ -229,6 +287,20 @@ print(health_status)
 3. **Performance Issues**: Set `LOG_LEVEL=WARNING` in production for fewer logs
 4. **Large Log Files**: Disable `MAX_DEBUG` mode when not actively debugging
 
+### Debugging Chat Message Issues
+
+To specifically debug chat message problems:
+
+1. Enable MAX_DEBUG mode temporarily
+2. Send a problematic message from the frontend
+3. Check these logs in order:
+   - `chat.log` - For the flow of the chat operation
+   - `error.log` - For any exceptions that occurred
+   - `tool_calls.log` - If the issue involves agent tools
+   - `sql.log` - If the issue might be database-related
+
+4. Look for the `debug_step` field in error logs to identify the exact point of failure
+
 ### Viewing Logs in Docker
 
 To view logs when running in Docker:
@@ -240,8 +312,8 @@ docker exec -it tooler_chat_backend_1 ls -la /app/logs
 # View a specific log file
 docker exec -it tooler_chat_backend_1 cat /app/logs/error.log
 
-# Follow a log file in real-time
-docker exec -it tooler_chat_backend_1 tail -f /app/logs/tooler_chat.log
+# Follow chat logs in real-time
+docker exec -it tooler_chat_backend_1 tail -f /app/logs/chat.log
 
 # Follow request logs in MAX_DEBUG mode
 docker exec -it tooler_chat_backend_1 tail -f /app/logs/requests.log
@@ -266,6 +338,7 @@ async def get_log_settings():
         "loggers": {
             "app": logging.getLevelName(logging.getLogger("app").level),
             "app.api": logging.getLevelName(logging.getLogger("app.api").level),
+            "app.api.chat": logging.getLevelName(logging.getLogger("app.api.chat").level),
             "sqlalchemy": logging. getLevelName(logging.getLogger("sqlalchemy").level),
         }
     }
