@@ -18,6 +18,6 @@ email-validator
 beautifulsoup4==4.12.2
 # Added for enhanced logging
 psutil==5.9.5
-pretty-traceback==0.2.3
+pretty-traceback>=2024.1021  # Using calver versioning, not semver
 python-json-logger==2.0.7
-richdisplay>=1.0.0
+# richdisplay>=1.0.0  # Remove this package as it's not necessary

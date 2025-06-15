@@ -78,7 +78,17 @@ class StructuredLogFormatter(logging.Formatter):
                 if key not in log_record:
                     log_record[key] = value
         
-        return json.dumps(log_record)
+        try:
+            return json.dumps(log_record)
+        except Exception as e:
+            # Fallback if JSON serialization fails
+            return json.dumps({
+                "timestamp": log_record["timestamp"],
+                "level": log_record["level"],
+                "logger": log_record["logger"],
+                "message": log_record["message"],
+                "error": f"Failed to serialize log record: {str(e)}"
+            })
 
 
 def setup_logging(
@@ -133,103 +143,111 @@ def setup_logging(
     
     # Add file handlers if enabled
     if log_to_file:
-        # Main application log - rotating by size
-        app_log_path = logs_dir / "tooler_chat.log"
-        app_handler = RotatingFileHandler(
-            filename=app_log_path,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
-        )
-        app_handler.setLevel(numeric_level)
-        app_handler.setFormatter(formatter)
-        root_logger.addHandler(app_handler)
-        
-        # Error log - separate file for errors and above
-        error_log_path = logs_dir / "error.log"
-        error_handler = RotatingFileHandler(
-            filename=error_log_path,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
-        )
-        error_handler.setLevel(logging.ERROR)
-        error_handler.setFormatter(formatter)
-        root_logger.addHandler(error_handler)
-        
-        # Daily log - rotating by date
-        daily_log_path = logs_dir / "daily.log"
-        daily_handler = TimedRotatingFileHandler(
-            filename=daily_log_path,
-            when="midnight",
-            interval=1,
-            backupCount=30  # Keep last 30 days
-        )
-        daily_handler.setLevel(numeric_level)
-        daily_handler.setFormatter(formatter)
-        daily_handler.suffix = "%Y-%m-%d"  # Use date as suffix for rotated files
-        root_logger.addHandler(daily_handler)
-        
-        # Tool/API endpoint specific log
-        tool_log_path = logs_dir / "tool_calls.log"
-        tool_handler = RotatingFileHandler(
-            filename=tool_log_path,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
-        )
-        tool_handler.setLevel(numeric_level)
-        tool_handler.setFormatter(formatter)
-        tool_logger = logging.getLogger("app.tools")
-        tool_logger.propagate = True  # Allow messages to propagate to root logger
-        tool_logger.addHandler(tool_handler)
-        
-        # API endpoint log
-        api_log_path = logs_dir / "api_endpoints.log"
-        api_handler = RotatingFileHandler(
-            filename=api_log_path,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
-        )
-        api_handler.setLevel(numeric_level)
-        api_handler.setFormatter(formatter)
-        api_logger = logging.getLogger("app.api")
-        api_logger.propagate = True  # Allow messages to propagate to root logger
-        api_logger.addHandler(api_handler)
-        
-        # Request/Response log for ultra-verbose mode
-        if max_debug:
-            request_log_path = logs_dir / "requests.log"
-            request_handler = RotatingFileHandler(
-                filename=request_log_path,
-                maxBytes=20 * 1024 * 1024,  # 20MB for verbose requests
-                backupCount=10
-            )
-            request_handler.setLevel(logging.DEBUG)  # Always DEBUG level
-            request_handler.setFormatter(formatter)
-            request_logger = logging.getLogger("app.api.middleware")
-            request_logger.setLevel(logging.DEBUG)  # Force to DEBUG level
-            request_logger.addHandler(request_handler)
-            
-            # Also set SQLModel and database loggers to DEBUG for SQL queries
-            logging.getLogger("sqlmodel").setLevel(logging.DEBUG)
-            logging.getLogger("sqlalchemy").setLevel(logging.DEBUG)
-            logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
-            
-            # Set FastAPI uvicorn logger to DEBUG
-            logging.getLogger("uvicorn").setLevel(logging.DEBUG)
-            logging.getLogger("uvicorn.access").setLevel(logging.DEBUG)
-            
-            # Add a handler for SQL queries
-            sql_log_path = logs_dir / "sql.log"
-            sql_handler = RotatingFileHandler(
-                filename=sql_log_path,
-                maxBytes=10 * 1024 * 1024,
+        try:
+            # Main application log - rotating by size
+            app_log_path = logs_dir / "tooler_chat.log"
+            app_handler = RotatingFileHandler(
+                filename=app_log_path,
+                maxBytes=10 * 1024 * 1024,  # 10MB
                 backupCount=5
             )
-            sql_handler.setLevel(logging.DEBUG)
-            sql_handler.setFormatter(formatter)
-            sql_logger = logging.getLogger("sqlalchemy.engine")
-            sql_logger.addHandler(sql_handler)
+            app_handler.setLevel(numeric_level)
+            app_handler.setFormatter(formatter)
+            root_logger.addHandler(app_handler)
             
-            print(f"MAX DEBUG MODE ENABLED - All requests, responses, and SQL queries will be logged")
+            # Error log - separate file for errors and above
+            error_log_path = logs_dir / "error.log"
+            error_handler = RotatingFileHandler(
+                filename=error_log_path,
+                maxBytes=10 * 1024 * 1024,  # 10MB
+                backupCount=5
+            )
+            error_handler.setLevel(logging.ERROR)
+            error_handler.setFormatter(formatter)
+            root_logger.addHandler(error_handler)
+            
+            # Daily log - rotating by date
+            daily_log_path = logs_dir / "daily.log"
+            daily_handler = TimedRotatingFileHandler(
+                filename=daily_log_path,
+                when="midnight",
+                interval=1,
+                backupCount=30  # Keep last 30 days
+            )
+            daily_handler.setLevel(numeric_level)
+            daily_handler.setFormatter(formatter)
+            daily_handler.suffix = "%Y-%m-%d"  # Use date as suffix for rotated files
+            root_logger.addHandler(daily_handler)
+            
+            # Tool/API endpoint specific log
+            tool_log_path = logs_dir / "tool_calls.log"
+            tool_handler = RotatingFileHandler(
+                filename=tool_log_path,
+                maxBytes=10 * 1024 * 1024,  # 10MB
+                backupCount=5
+            )
+            tool_handler.setLevel(numeric_level)
+            tool_handler.setFormatter(formatter)
+            tool_logger = logging.getLogger("app.tools")
+            tool_logger.propagate = True  # Allow messages to propagate to root logger
+            tool_logger.addHandler(tool_handler)
+            
+            # API endpoint log
+            api_log_path = logs_dir / "api_endpoints.log"
+            api_handler = RotatingFileHandler(
+                filename=api_log_path,
+                maxBytes=10 * 1024 * 1024,  # 10MB
+                backupCount=5
+            )
+            api_handler.setLevel(numeric_level)
+            api_handler.setFormatter(formatter)
+            api_logger = logging.getLogger("app.api")
+            api_logger.propagate = True  # Allow messages to propagate to root logger
+            api_logger.addHandler(api_handler)
+            
+            # Request/Response log for ultra-verbose mode
+            if max_debug:
+                request_log_path = logs_dir / "requests.log"
+                request_handler = RotatingFileHandler(
+                    filename=request_log_path,
+                    maxBytes=20 * 1024 * 1024,  # 20MB for verbose requests
+                    backupCount=10
+                )
+                request_handler.setLevel(logging.DEBUG)  # Always DEBUG level
+                request_handler.setFormatter(formatter)
+                request_logger = logging.getLogger("app.api.middleware")
+                request_logger.setLevel(logging.DEBUG)  # Force to DEBUG level
+                request_logger.addHandler(request_handler)
+                
+                # Also set SQLModel and database loggers to DEBUG for SQL queries
+                logging.getLogger("sqlmodel").setLevel(logging.DEBUG)
+                logging.getLogger("sqlalchemy").setLevel(logging.DEBUG)
+                logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
+                
+                # Set FastAPI uvicorn logger to DEBUG
+                logging.getLogger("uvicorn").setLevel(logging.DEBUG)
+                logging.getLogger("uvicorn.access").setLevel(logging.DEBUG)
+                
+                # Add a handler for SQL queries
+                sql_log_path = logs_dir / "sql.log"
+                sql_handler = RotatingFileHandler(
+                    filename=sql_log_path,
+                    maxBytes=10 * 1024 * 1024,
+                    backupCount=5
+                )
+                sql_handler.setLevel(logging.DEBUG)
+                sql_handler.setFormatter(formatter)
+                sql_logger = logging.getLogger("sqlalchemy.engine")
+                sql_logger.addHandler(sql_handler)
+                
+                print(f"MAX DEBUG MODE ENABLED - All requests, responses, and SQL queries will be logged")
+        except Exception as e:
+            # Fallback to console-only logging if file handlers fail
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setLevel(numeric_level)
+            console_handler.setFormatter(formatter)
+            root_logger.addHandler(console_handler)
+            print(f"Error setting up file handlers: {str(e)}. Falling back to console logging.")
 
 
 def set_request_id(request_id: Optional[str] = None):
