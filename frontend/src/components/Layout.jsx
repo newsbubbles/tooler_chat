@@ -170,18 +170,6 @@ export default function Layout() {
           <IconButton color="inherit" onClick={handleRightPanelToggle}>
             <SettingsIcon />
           </IconButton>
-          <IconButton
-            size="large"
-            aria-label="account of current user"
-            aria-controls="menu-appbar"
-            aria-haspopup="true"
-            onClick={handleMenuClick}
-            color="inherit"
-          >
-            <Avatar sx={{ width: 32, height: 32 }}>
-              {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
-            </Avatar>
-          </IconButton>
           <Menu
             id="menu-appbar"
             anchorEl={anchorEl}
