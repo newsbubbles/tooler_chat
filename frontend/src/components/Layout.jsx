@@ -118,20 +118,28 @@ export default function Layout() {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
           }),
+          backgroundColor: "background.default",
+          boxShadow: "none",
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ backgroundColor: "background.default" }}>
           <IconButton
-            color="inherit"
+            color="#707070"
             aria-label="open drawer"
             onClick={handleDrawerToggle}
             edge="start"
-            sx={{ mr: 2 }}
+            sx={{ mr: 1 }}
           >
-            <MenuIcon />
+            <MenuIcon sx={{ color: "#707070" }} />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Tooler Chat
+          <Typography
+            variant="h4"
+            noWrap
+            component="div"
+            sx={{ flexGrow: 1 }}
+            color="#707070"
+          >
+            +
           </Typography>
           <IconButton color="inherit" onClick={handleRightPanelToggle}>
             <SettingsIcon />

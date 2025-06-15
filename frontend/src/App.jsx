@@ -20,7 +20,7 @@ const theme = createTheme({
       main: "#f50057",
     },
     background: {
-      default: "#121212",
+      default: "#171717",
     },
   },
   typography: {

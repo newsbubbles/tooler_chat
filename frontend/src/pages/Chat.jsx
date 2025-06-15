@@ -224,7 +224,7 @@ export default function Chat() {
       }}
     >
       {/* Chat header */}
-      <Paper
+      {/* <Paper
         elevation={1}
         sx={{
           p: 2,
@@ -267,9 +267,9 @@ export default function Chat() {
             <DeleteIcon />
           </IconButton>
         )}
-      </Paper>
+      </Paper> */}
 
-      <Divider />
+      {/* <Divider /> */}
 
       {/* Messages container */}
       <Box
@@ -333,59 +333,140 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </Box>
 
-      <Divider />
-
       {/* Message input */}
-      <Paper
-        component="form"
-        onSubmit={handleSendMessage}
+      <Box
         sx={{
-          p: 2,
-          display: "flex",
-          alignItems: "center",
-          borderRadius: 0,
-          borderTop: "1px solid rgba(0, 0, 0, 0.12)",
+          p: 3,
         }}
-        elevation={4}
       >
-        <TextField
-          fullWidth
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              if (
-                message.trim() &&
-                selectedAgent &&
-                !isLoading &&
-                !isSendingMessage
-              ) {
-                handleSendMessage(e);
-              }
-            }
+        <Paper
+          sx={{
+            borderRadius: "16px 16px 27px 27px",
+            backgroundColor: "#232323",
+
+            boxShadow: "none",
+            p: 2,
           }}
-          placeholder="Type a message..."
-          variant="outlined"
-          multiline
-          maxRows={4}
-          disabled={isLoading || isSendingMessage}
-        />
-        <Box sx={{ ml: 1, display: "flex", alignItems: "center" }}>
-          {isLoading || isSendingMessage ? (
-            <CircularProgress size={24} sx={{ mx: 1 }} />
-          ) : (
-            <IconButton
-              color="primary"
-              type="submit"
-              disabled={!message.trim() || !selectedAgent}
-              size="large"
-            >
-              <SendIcon />
-            </IconButton>
-          )}
-        </Box>
-      </Paper>
+          elevation={0}
+        >
+          {/* Text input only */}
+          <Box
+            sx={{
+              mb: 1, // Space between text input and icons below
+            }}
+          >
+            <TextField
+              fullWidth
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (
+                    message.trim() &&
+                    selectedAgent &&
+                    !isLoading &&
+                    !isSendingMessage
+                  ) {
+                    handleSendMessage(e);
+                  }
+                }
+              }}
+              placeholder="What can I do for you?"
+              variant="standard"
+              multiline
+              maxRows={4}
+              disabled={isLoading || isSendingMessage}
+              sx={{
+                "& .MuiInputBase-root": {
+                  color: "#fff",
+                  fontSize: "16px",
+                  "&::before": {
+                    display: "none",
+                  },
+                  "&::after": {
+                    display: "none",
+                  },
+                  "&:hover::before": {
+                    display: "none",
+                  },
+                },
+                "& .MuiInputBase-input": {
+                  padding: "2px 0",
+                  "&::placeholder": {
+                    color: "#888",
+                    opacity: 1,
+                  },
+                },
+              }}
+            />
+          </Box>
+
+          {/* Icons and send button below the text input */}
+          <Box
+            component="form"
+            onSubmit={handleSendMessage}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            {/* Left side icons */}
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <IconButton
+                size="small"
+                sx={{
+                  color: "#888",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  },
+                }}
+              >
+                🎤
+              </IconButton>
+              <IconButton
+                size="small"
+                sx={{
+                  color: "#888",
+                  ml: 1,
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  },
+                }}
+              >
+                📎
+              </IconButton>
+            </Box>
+
+            {/* Send button */}
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              {isLoading || isSendingMessage ? (
+                <CircularProgress size={24} sx={{ color: "#fff" }} />
+              ) : (
+                <IconButton
+                  color="primary"
+                  type="submit"
+                  // disabled={!message.trim() || !selectedAgent}
+                  size="large"
+                  sx={{
+                    backgroundColor: "#EB5C1F",
+                    color: "#fff",
+                    borderRadius: "50%",
+                    width: 40,
+                    height: 40,
+                    "&:hover": {
+                      backgroundColor: "#D14A15",
+                    },
+                  }}
+                >
+                  <SendIcon />
+                </IconButton>
+              )}
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
 
       {/* Delete confirmation dialog */}
       <Dialog
