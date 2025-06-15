@@ -10,6 +10,7 @@ Tooler Chat is an application for talking to the Tooler Agent, building, bundlin
 - Associate MCP servers with agents as plugins
 - Save and organize chat sessions
 - User authentication and session management
+- Advanced logging and debugging system with web interface
 
 ## Tech Stack
 
@@ -20,6 +21,7 @@ Tooler Chat is an application for talking to the Tooler Agent, building, bundlin
 - Pydantic AI: Framework for working with AI models and agents
 - JWT: Secure authentication using JSON Web Tokens
 - Docker: Containerization for consistent deployment
+- Advanced Structured Logging: Comprehensive logging system with rotation and filtering
 
 ### Frontend
 - React: JavaScript library for building user interfaces
@@ -37,10 +39,12 @@ tooler_chat/
 │   ├── app/
 │   │   ├── api/           # API endpoints
 │   │   ├── core/          # Core functionality
+│   │   │   ├── logging/   # Advanced logging system
 │   │   ├── db/            # Database configuration
 │   │   ├── models/        # Database models
 │   │   ├── schemas/       # Pydantic schemas
 │   │   ├── services/      # Business logic
+│   │   ├── tools/         # Tool implementations
 │   │   └── main.py        # FastAPI app entry point
 │   ├── Dockerfile         # Backend Docker configuration
 │   └── requirements.txt   # Python dependencies
@@ -50,6 +54,7 @@ tooler_chat/
 │   │   ├── components/    # React components
 │   │   ├── contexts/      # State management
 │   │   ├── pages/         # Page components
+│   │   │   ├── Admin/     # Admin pages including LogViewer
 │   │   ├── services/      # API services
 │   │   ├── App.jsx        # Main App component
 │   │   └── index.jsx      # Entry point
@@ -57,6 +62,9 @@ tooler_chat/
 │   └── package.json       # JavaScript dependencies
 ├── docker/                # Docker configurations
 ├── docker-compose.yml     # Docker Compose config
+├── logs/                  # Application logs (mounted volume)
+├── docs/                  # Documentation
+│   └── LOGGING.md         # Logging system documentation
 ├── .env.example          # Example environment variables
 └── README.md             # Project documentation
 ```
@@ -132,6 +140,19 @@ If you want to use Nginx on the host system as a reverse proxy, run:
 ```
 
 This will create an `nginx-host.conf` file that you can include in your system's Nginx configuration.
+
+### Logging Configuration
+
+The application includes a comprehensive logging system that can be configured via environment variables:
+
+- `LOG_LEVEL`: Sets the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `STRUCTURED_LOGS`: Whether to use JSON structured logging (true/false)
+
+Logs are stored in the `logs/` directory with rotation policies. For more details, see the [Logging Documentation](docs/LOGGING.md).
+
+### Log Viewer
+
+Admin users can access the log viewer interface at http://localhost:34140/admin/logs to browse, filter, and download log files.
 
 ### Development
 

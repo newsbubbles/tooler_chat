@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import {
   Box,
   Drawer,
@@ -28,6 +28,8 @@ import {
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   AccountCircle as AccountCircleIcon,
+  AdminPanelSettings as AdminIcon,
+  Assessment as LogsIcon,
 } from '@mui/icons-material';
 
 import { useAuthStore } from '../contexts/authStore';
@@ -41,13 +43,15 @@ const rightPanelWidth = 280;
 
 export default function Layout() {
   const theme = useTheme();
+  const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
   const [rightPanelOpen, setRightPanelOpen] = useState(!isMobile);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [adminMenuAnchorEl, setAdminMenuAnchorEl] = useState(null);
   const [createAgentDialogOpen, setCreateAgentDialogOpen] = useState(false);
 
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAdmin } = useAuthStore();
   const { agents, selectedAgent, selectAgent, loadAgents } = useAgentsStore();
   const { sessions, selectedSession, selectSession, loadSessions } = useChatStore();
 
@@ -72,6 +76,14 @@ export default function Layout() {
     setAnchorEl(null);
   };
 
+  const handleAdminMenuClick = (event) => {
+    setAdminMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleAdminMenuClose = () => {
+    setAdminMenuAnchorEl(null);
+  };
+
   const handleLogout = () => {
     handleMenuClose();
     logout();
@@ -94,6 +106,11 @@ export default function Layout() {
 
   const handleCreateAgent = () => {
     setCreateAgentDialogOpen(true);
+  };
+
+  const navigateToLogs = () => {
+    handleAdminMenuClose();
+    navigate('/admin/logs');
   };
 
   return (
@@ -122,6 +139,41 @@ export default function Layout() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Tooler Chat
           </Typography>
+          
+          {isAdmin && (
+            <>
+              <IconButton 
+                color="inherit" 
+                onClick={handleAdminMenuClick}
+                sx={{ mr: 1 }}
+                title="Admin Panel"
+              >
+                <AdminIcon />
+              </IconButton>
+              <Menu
+                id="admin-menu"
+                anchorEl={adminMenuAnchorEl}
+                open={Boolean(adminMenuAnchorEl)}
+                onClose={handleAdminMenuClose}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'right',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
+              >
+                <MenuItem onClick={navigateToLogs}>
+                  <ListItemIcon>
+                    <LogsIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Log Viewer" />
+                </MenuItem>
+              </Menu>
+            </>
+          )}
+          
           <IconButton color="inherit" onClick={handleRightPanelToggle}>
             <SettingsIcon />
           </IconButton>

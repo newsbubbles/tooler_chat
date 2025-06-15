@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
 import NotFound from './pages/NotFound';
+import LogViewer from './pages/Admin/LogViewer';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuthStore } from './contexts/authStore';
 
@@ -38,7 +39,7 @@ const theme = createTheme({
 });
 
 function App() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isAdmin } = useAuthStore();
 
   return (
     <ThemeProvider theme={theme}>
@@ -57,6 +58,11 @@ function App() {
           <Route index element={<Navigate to="/chat" />} />
           <Route path="chat" element={<Chat />} />
           <Route path="chat/:sessionId" element={<Chat />} />
+          {/* Admin routes */}
+          <Route 
+            path="admin/logs" 
+            element={isAdmin ? <LogViewer /> : <Navigate to="/" />} 
+          />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

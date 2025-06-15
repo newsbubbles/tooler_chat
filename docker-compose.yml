@@ -12,8 +12,12 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - SERPER_API_KEY=${SERPER_API_KEY}
       - PORT=${BACKEND_PORT:-34130}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - STRUCTURED_LOGS=${STRUCTURED_LOGS:-true}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
     volumes:
       - ./backend/app:/app/app
+      - ./logs:/app/logs  # Mount logs directory
     depends_on:
       - db
     restart: always
@@ -47,6 +51,7 @@ services:
 
 volumes:
   postgres_data:
+  logs_data:  # Define a named volume for logs
 
 networks:
   app-network:

@@ -4,11 +4,12 @@ import api from "../services/api";
 
 export const useAuthStore = create(
   persist(
-    (set) => ({
+    (set, get) => ({
       isAuthenticated: false,
       user: null,
       token: null,
       sessionUuid: null,
+      isAdmin: false,  // Add isAdmin flag
 
       login: async (username, password) => {
         try {
@@ -25,12 +26,17 @@ export const useAuthStore = create(
 
           // Get user info
           const userResponse = await api.get("/api/users/me");
+          
+          // Check if user is an admin (you might want to adjust this based on your actual user model)
+          const isAdmin = userResponse.data.is_admin === true || 
+                         userResponse.data.username === "admin"; // Temporary admin check
 
           set({
             isAuthenticated: true,
             user: userResponse.data,
             token: access_token,
             sessionUuid: session_uuid,
+            isAdmin: isAdmin,  // Set admin status
           });
 
           return { success: true };
@@ -66,16 +72,24 @@ export const useAuthStore = create(
           user: null,
           token: null,
           sessionUuid: null,
+          isAdmin: false,  // Reset admin status on logout
         });
       },
 
       // Setup auth on app init
       initAuth: () => {
-        const state = useAuthStore.getState();
+        const state = get();
         if (state.token) {
           api.defaults.headers.common[
             "Authorization"
           ] = `Bearer ${state.token}`;
+          
+          // Check admin status on init (load from persisted state)
+          if (state.user) {
+            set({ 
+              isAdmin: state.user.is_admin === true || state.user.username === "admin"
+            });
+          }
         }
       },
     }),
@@ -86,6 +100,7 @@ export const useAuthStore = create(
         user: state.user,
         token: state.token,
         sessionUuid: state.sessionUuid,
+        isAdmin: state.isAdmin,  // Persist admin status
       }),
     }
   )
