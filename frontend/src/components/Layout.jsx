@@ -19,6 +19,7 @@ import {
   useTheme,
   useMediaQuery,
   Button,
+  Paper,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -28,6 +29,10 @@ import {
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   AccountCircle as AccountCircleIcon,
+  Apps as AppsIcon,
+  Folder as FolderIcon,
+  Schedule as ScheduleIcon,
+  CloudUpload as CloudUploadIcon,
 } from "@mui/icons-material";
 
 import { useAuthStore } from "../contexts/authStore";
@@ -105,6 +110,27 @@ export default function Layout() {
 
   const handleCreateAgent = () => {
     setCreateAgentDialogOpen(true);
+  };
+
+  // Bottom icon handlers
+  const handleAppsClick = () => {
+    console.log("Apps clicked");
+    // Add your apps functionality here
+  };
+
+  const handleFolderClick = () => {
+    console.log("Folder clicked");
+    // Add your folder functionality here
+  };
+
+  const handleScheduleClick = () => {
+    console.log("Schedule clicked");
+    // Add your schedule functionality here
+  };
+
+  const handleUploadClick = () => {
+    console.log("Upload clicked");
+    // Add your upload functionality here
   };
 
   return (
@@ -308,9 +334,102 @@ export default function Layout() {
         }}
       >
         <Toolbar />
-        <Box sx={{ flex: 1, overflow: "auto" }}>
+        <Box sx={{ flex: 1, overflow: "auto", mb: -2 }}>
+          {" "}
           <Outlet />
         </Box>
+
+        {/* Bottom Icons Bar */}
+        <Paper
+          elevation={0}
+          sx={{
+            position: "relative",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: "#171717",
+            backgroundImage: "none",
+            m: 0,
+            mb: 3,
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              px: 5,
+              py: 0,
+            }}
+          >
+            <IconButton
+              onClick={handleAppsClick}
+              sx={{
+                color: "#9E9E9E",
+                "&:hover": {
+                  color: "#FFF",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                },
+              }}
+            >
+              <AppsIcon />
+            </IconButton>
+
+            <IconButton
+              onClick={handleFolderClick}
+              sx={{
+                color: "#9E9E9E",
+                "&:hover": {
+                  color: "#FFF",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                },
+              }}
+            >
+              <FolderIcon />
+            </IconButton>
+
+            <IconButton
+              onClick={handleScheduleClick}
+              sx={{
+                color: "#9E9E9E",
+                "&:hover": {
+                  color: "#FFF",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                },
+              }}
+            >
+              <ScheduleIcon />
+            </IconButton>
+
+            <IconButton
+              onClick={handleUploadClick}
+              sx={{
+                color: "#9E9E9E",
+                "&:hover": {
+                  color: "#FFF",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                },
+              }}
+            >
+              <CloudUploadIcon />
+            </IconButton>
+
+            <Avatar
+              sx={{
+                width: 32,
+                height: 32,
+                backgroundColor: "#4A90E2",
+                cursor: "pointer",
+                "&:hover": {
+                  backgroundColor: "#357ABD",
+                },
+              }}
+              onClick={handleMenuClick}
+            >
+              {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
+            </Avatar>
+          </Box>
+        </Paper>
       </Box>
 
       {/* Right Panel - MCPs & Project Structure */}

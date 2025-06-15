@@ -19,6 +19,8 @@ import {
   Send as SendIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Mic as MicIcon,
+  AttachFile as AttachFileIcon,
 } from "@mui/icons-material";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -223,60 +225,18 @@ export default function Chat() {
         position: "relative",
       }}
     >
-      {/* Chat header */}
-      {/* <Paper
-        elevation={1}
-        sx={{
-          p: 2,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          borderRadius: 0,
-          zIndex: 10,
-        }}
-      >
-        {isEditingTitle ? (
-          <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-            <TextField
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              variant="outlined"
-              size="small"
-              autoFocus
-              fullWidth
-            />
-            <Button onClick={handleTitleUpdate} sx={{ ml: 1 }}>
-              Save
-            </Button>
-          </Box>
-        ) : (
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <Typography variant="h6" sx={{ mr: 1 }}>
-              {title}
-            </Typography>
-            {selectedSession && (
-              <IconButton size="small" onClick={() => setIsEditingTitle(true)}>
-                <EditIcon fontSize="small" />
-              </IconButton>
-            )}
-          </Box>
-        )}
-
-        {selectedSession && (
-          <IconButton color="error" onClick={() => setDeleteDialogOpen(true)}>
-            <DeleteIcon />
-          </IconButton>
-        )}
-      </Paper> */}
-
-      {/* <Divider /> */}
-
       {/* Messages container */}
       <Box
         sx={{
           flex: 1,
           overflow: "auto",
           p: 2,
+
+          "&::-webkit-scrollbar": {
+            display: "none",
+          },
+          msOverflowStyle: "none",
+          scrollbarWidth: "none",
         }}
       >
         {isLoadingMessages ? (
@@ -306,6 +266,10 @@ export default function Chat() {
                   p: 2,
                   maxWidth: "80%",
                   borderRadius: 2,
+                  backgroundColor:
+                    msg.role === "user" ? "#000000" : "transparent",
+                  backgroundImage: "none",
+                  boxShadow: "none",
                 }}
               >
                 <Typography
@@ -423,7 +387,7 @@ export default function Chat() {
                   },
                 }}
               >
-                🎤
+                <MicIcon />
               </IconButton>
               <IconButton
                 size="small"
@@ -435,7 +399,7 @@ export default function Chat() {
                   },
                 }}
               >
-                📎
+                <AttachFileIcon />
               </IconButton>
             </Box>
 
