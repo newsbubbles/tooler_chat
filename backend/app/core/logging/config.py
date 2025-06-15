@@ -85,7 +85,8 @@ def setup_logging(
     log_level: str = None,
     structured: bool = None,
     log_to_file: bool = True,
-    log_to_console: bool = True
+    log_to_console: bool = True,
+    max_debug: bool = False  # New parameter for ultra-verbose logging
 ) -> None:
     """Set up logging configuration
     
@@ -94,10 +95,12 @@ def setup_logging(
         structured: Whether to use JSON structured logging format
         log_to_file: Whether to log to files
         log_to_console: Whether to log to console
+        max_debug: Enable ultra-verbose logging (all requests, responses, etc.)
     """
     # Get configuration from environment variables or use defaults
     log_level = log_level or os.getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
     structured = structured if structured is not None else os.getenv("STRUCTURED_LOGS", DEFAULT_STRUCTURED_FORMAT) in (True, "true", "True", "1")
+    max_debug = max_debug or os.getenv("MAX_DEBUG", "false").lower() in ("true", "1", "yes")
     
     # Convert log level string to constant
     numeric_level = getattr(logging, log_level.upper(), None)
@@ -190,6 +193,43 @@ def setup_logging(
         api_logger = logging.getLogger("app.api")
         api_logger.propagate = True  # Allow messages to propagate to root logger
         api_logger.addHandler(api_handler)
+        
+        # Request/Response log for ultra-verbose mode
+        if max_debug:
+            request_log_path = logs_dir / "requests.log"
+            request_handler = RotatingFileHandler(
+                filename=request_log_path,
+                maxBytes=20 * 1024 * 1024,  # 20MB for verbose requests
+                backupCount=10
+            )
+            request_handler.setLevel(logging.DEBUG)  # Always DEBUG level
+            request_handler.setFormatter(formatter)
+            request_logger = logging.getLogger("app.api.middleware")
+            request_logger.setLevel(logging.DEBUG)  # Force to DEBUG level
+            request_logger.addHandler(request_handler)
+            
+            # Also set SQLModel and database loggers to DEBUG for SQL queries
+            logging.getLogger("sqlmodel").setLevel(logging.DEBUG)
+            logging.getLogger("sqlalchemy").setLevel(logging.DEBUG)
+            logging.getLogger("sqlalchemy.engine").setLevel(logging.DEBUG)
+            
+            # Set FastAPI uvicorn logger to DEBUG
+            logging.getLogger("uvicorn").setLevel(logging.DEBUG)
+            logging.getLogger("uvicorn.access").setLevel(logging.DEBUG)
+            
+            # Add a handler for SQL queries
+            sql_log_path = logs_dir / "sql.log"
+            sql_handler = RotatingFileHandler(
+                filename=sql_log_path,
+                maxBytes=10 * 1024 * 1024,
+                backupCount=5
+            )
+            sql_handler.setLevel(logging.DEBUG)
+            sql_handler.setFormatter(formatter)
+            sql_logger = logging.getLogger("sqlalchemy.engine")
+            sql_logger.addHandler(sql_handler)
+            
+            print(f"MAX DEBUG MODE ENABLED - All requests, responses, and SQL queries will be logged")
 
 
 def set_request_id(request_id: Optional[str] = None):
@@ -205,33 +245,64 @@ def get_request_id() -> str:
     return local.request_id
 
 
+class LoggerExtension:
+    """Adds additional methods to a logger instance"""
+    
+    def __init__(self, logger):
+        self._logger = logger
+    
+    def catch_exceptions(self, operation_name: str):
+        """Context manager for catching and logging exceptions"""
+        from contextlib import contextmanager
+        
+        @contextmanager
+        def context_manager():
+            try:
+                yield
+            except Exception as e:
+                self._logger.error_data(
+                    f"Exception in {operation_name}",
+                    {"error": str(e), "operation": operation_name},
+                    exc_info=True
+                )
+                raise
+        
+        return context_manager()
+
+
 def get_logger(name: str):
     """Get a logger with enhanced functionality"""
     logger = logging.getLogger(name)
     
-    def log_with_data(level: int, msg: str, data: Dict[str, Any] = None, **kwargs):
-        """Log at the specified level with additional structured data"""
-        if logger.isEnabledFor(level):
-            # Create a record with extra data
-            extra = kwargs.pop("extra", {}) or {}
-            extra["data"] = data or {}
-            
-            # Add any kwargs to the data
-            if kwargs:
-                extra["data"].update(kwargs)
-            
-            # Add request_id to all logs if not already present
-            if "request_id" not in extra:
-                extra["request_id"] = get_request_id()
+    # Only enhance if not already enhanced
+    if not hasattr(logger, "info_data"):
+        # Add extension methods
+        extension = LoggerExtension(logger)
+        logger.catch_exceptions = extension.catch_exceptions
+        
+        def log_with_data(level: int, msg: str, data: Dict[str, Any] = None, **kwargs):
+            """Log at the specified level with additional structured data"""
+            if logger.isEnabledFor(level):
+                # Create a record with extra data
+                extra = kwargs.pop("extra", {}) or {}
+                extra["data"] = data or {}
                 
-            logger._log(level, msg, (), extra=extra)
-    
-    # Add custom methods to the logger
-    logger.debug_data = lambda msg, data=None, **kwargs: log_with_data(logging.DEBUG, msg, data, **kwargs)
-    logger.info_data = lambda msg, data=None, **kwargs: log_with_data(logging.INFO, msg, data, **kwargs)
-    logger.warning_data = lambda msg, data=None, **kwargs: log_with_data(logging.WARNING, msg, data, **kwargs)
-    logger.error_data = lambda msg, data=None, **kwargs: log_with_data(logging.ERROR, msg, data, **kwargs)
-    logger.critical_data = lambda msg, data=None, **kwargs: log_with_data(logging.CRITICAL, msg, data, **kwargs)
+                # Add any kwargs to the data
+                if kwargs:
+                    extra["data"].update(kwargs)
+                
+                # Add request_id to all logs if not already present
+                if "request_id" not in extra:
+                    extra["request_id"] = get_request_id()
+                    
+                logger._log(level, msg, (), extra=extra)
+        
+        # Add custom methods to the logger
+        logger.debug_data = lambda msg, data=None, **kwargs: log_with_data(logging.DEBUG, msg, data, **kwargs)
+        logger.info_data = lambda msg, data=None, **kwargs: log_with_data(logging.INFO, msg, data, **kwargs)
+        logger.warning_data = lambda msg, data=None, **kwargs: log_with_data(logging.WARNING, msg, data, **kwargs)
+        logger.error_data = lambda msg, data=None, **kwargs: log_with_data(logging.ERROR, msg, data, **kwargs)
+        logger.critical_data = lambda msg, data=None, **kwargs: log_with_data(logging.CRITICAL, msg, data, **kwargs)
     
     # Return the enhanced logger
     return logger

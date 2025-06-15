@@ -12,6 +12,8 @@ The advanced logging system provides:
 4. Log decorators for API endpoints and tools
 5. Web-based log viewer for administrators
 6. System information logging
+7. Ultra-verbose debugging mode with full request/response bodies
+8. SQL query logging with timing information
 
 ## Log Files
 
@@ -23,6 +25,11 @@ Logs are stored in the `logs/` directory with several different files:
 - `tool_calls.log` - Log of tool calls only
 - `api_endpoints.log` - Log of API endpoint calls only
 
+When MAX_DEBUG mode is enabled, additional log files are created:
+
+- `requests.log` - Detailed log of all HTTP requests and responses with bodies
+- `sql.log` - Detailed log of all SQL queries with parameters and timing
+
 ## Configuration
 
 Logging can be configured via environment variables in your `.env` file:
@@ -30,7 +37,27 @@ Logging can be configured via environment variables in your `.env` file:
 ```env
 LOG_LEVEL=INFO            # DEBUG, INFO, WARNING, ERROR, CRITICAL
 STRUCTURED_LOGS=true       # Whether to use JSON format (true/false)
+MAX_DEBUG=false           # Enable ultra-verbose logging (true/false)
+SQL_ECHO=false            # Enable SQL query logging (true/false)
 ```
+
+### MAX_DEBUG Mode
+
+For maximum debugging capabilities, enable MAX_DEBUG mode:
+
+```env
+MAX_DEBUG=true
+```
+
+This will:
+
+1. Log **every** HTTP request with full headers and bodies
+2. Log **every** HTTP response with full headers and bodies
+3. Log **every** SQL query with parameters and timing
+4. Create dedicated log files for requests and SQL queries
+5. Set all loggers to DEBUG level
+
+**Note:** This generates a large volume of logs and should only be used temporarily for debugging.
 
 ## Using Logging in Code
 
@@ -101,11 +128,50 @@ async with async_log_operation("batch_processing", log_level="DEBUG"):
     await process_batch(items)
 ```
 
+### Exception Catching
+
+Use the catch_exceptions context manager to automatically log and re-raise exceptions:
+
+```python
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+# This will catch, log, and re-raise any exceptions
+with logger.catch_exceptions("important_operation"):
+    # Code that might raise exceptions
+    process_data()
+```
+
 ## Middleware for Request Tracking
 
-All HTTP requests are automatically logged by the `LoggingMiddleware` which adds unique request IDs to each request and tracks timing information.
+All HTTP requests are automatically logged by the `LoggingMiddleware` with:
+
+- Unique request IDs for each request
+- Timing information at millisecond precision
+- HTTP method, path, and status code
+- Request headers (with sensitive values redacted)
+- Response headers (with sensitive values redacted)
+
+In MAX_DEBUG mode, it also logs:
+
+- Full request bodies (with sensitive fields redacted)
+- Full response bodies (with sensitive fields redacted)
+- Query parameters
+- Client information
 
 The request ID is returned in the response header `X-Request-ID` and can be used for correlating logs across multiple services.
+
+## Database Query Logging
+
+When `SQL_ECHO=true` or `MAX_DEBUG=true`, all database queries are logged with:
+
+- SQL query text
+- Query parameters 
+- Execution time in milliseconds
+- Success or failure status
+
+This logging is done automatically for all database operations.
 
 ## Log Viewer UI
 
@@ -142,6 +208,18 @@ from app.core.logging.utils import log_system_info
 log_system_info()
 ```
 
+### Database Health Check
+
+Check database connectivity and performance:
+
+```python
+from app.db.database import db_health_check
+
+# Get database status and performance metrics
+health_status = await db_health_check()
+print(health_status)
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -149,6 +227,7 @@ log_system_info()
 1. **Missing Logs**: Ensure the `logs` directory exists and is writable
 2. **Log Format Issues**: Set `STRUCTURED_LOGS=false` to use plain text logs
 3. **Performance Issues**: Set `LOG_LEVEL=WARNING` in production for fewer logs
+4. **Large Log Files**: Disable `MAX_DEBUG` mode when not actively debugging
 
 ### Viewing Logs in Docker
 
@@ -163,6 +242,31 @@ docker exec -it tooler_chat_backend_1 cat /app/logs/error.log
 
 # Follow a log file in real-time
 docker exec -it tooler_chat_backend_1 tail -f /app/logs/tooler_chat.log
+
+# Follow request logs in MAX_DEBUG mode
+docker exec -it tooler_chat_backend_1 tail -f /app/logs/requests.log
 ```
 
 Alternatively, logs are mounted to the host system in the `./logs` directory when using docker-compose.
+
+### Checking Log Settings
+
+Add this API endpoint to check current log settings:
+
+```python
+@app.get("/api/logs/settings")
+async def get_log_settings():
+    import logging
+    return {
+        "log_level": os.getenv("LOG_LEVEL", "INFO"),
+        "structured_logs": os.getenv("STRUCTURED_LOGS", "true"),
+        "max_debug": os.getenv("MAX_DEBUG", "false"),
+        "sql_echo": os.getenv("SQL_ECHO", "false"),
+        "root_logger_level": logging.getLevelName(logging.getLogger().level),
+        "loggers": {
+            "app": logging.getLevelName(logging.getLogger("app").level),
+            "app.api": logging.getLevelName(logging.getLogger("app.api").level),
+            "sqlalchemy": logging. getLevelName(logging.getLogger("sqlalchemy").level),
+        }
+    }
+```
